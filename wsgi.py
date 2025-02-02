@@ -1,5 +1,7 @@
-from main import app as application
+# Remplacer le contenu par :
+from app import create_app
+
+app = create_app()
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(application, host="0.0.0.0", port=8000)
+    app.run()
