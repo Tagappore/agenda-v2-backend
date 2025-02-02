@@ -198,7 +198,7 @@ async def read_users_me(
     current_user: dict = Depends(get_current_user)
 ):
     # Convertir le document MongoDB en format compatible avec le modèle User
-    current_time = datetime.datetime.now()
+    current_time = datetime.now()
     user_dict = {
         "id": str(current_user["_id"]) if "_id" in current_user else str(current_user["id"]),
         "email": current_user["email"],
