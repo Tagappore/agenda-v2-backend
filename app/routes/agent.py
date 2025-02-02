@@ -135,7 +135,7 @@ async def create_agent(
                "password": password
            }
            email_response = await client.post(
-               "http://localhost:8000/api/send-credentials",
+               "https://agenda-v2-backend.onrender.com/api/send-credentials",
                data=email_data
            )
            if email_response.status_code != 200:
@@ -396,7 +396,7 @@ async def reset_agent_password(
                "password": new_password
            }
            email_response = await client.post(
-               "http://localhost:8000/api/send-credentials",
+               "https://agenda-v2-backend.onrender.com/api/send-credentials",
                data=email_data
            )
            if email_response.status_code != 200:
