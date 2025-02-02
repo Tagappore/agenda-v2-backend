@@ -2,11 +2,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 import datetime
+from fastapi import Form
+from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from ..services.auth import AuthService
 from ..models.user import UserCreate, User
 from ..config import settings
 from datetime import timedelta,timezone
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import smtplib
+
+
+
 
 router = APIRouter(tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -50,6 +58,51 @@ async def get_current_user(
         raise credentials_exception
         
     return user
+
+@router.post("/auth/reset-password")
+async def reset_password(
+    email: str = Form(...),
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    try:
+        # Réinitialiser le mot de passe
+        new_password = await auth_service.reset_password(email)
+        
+        # Configuration email
+        sender_email = "contact@tag-appore.com"
+        smtp_password = ",4)%vdrnYDPq"
+        
+        # Créer le message
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = email
+        msg['Subject'] = "Réinitialisation de votre mot de passe Tag Appore"
+        
+        body = f"""
+        Bonjour,
+        
+        Voici votre nouveau mot de passe pour votre compte Tag Appore : {new_password}
+        
+        Nous vous recommandons de le changer lors de votre prochaine connexion.
+        
+        Cordialement,
+        L'équipe Tag Appore
+        """
+        
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Envoyer l'email via O2switch
+        with smtplib.SMTP_SSL('vautour.o2switch.net', 465) as server:
+            server.login(sender_email, smtp_password)
+            server.send_message(msg)
+            
+        return {"message": "Un nouveau mot de passe a été envoyé à votre adresse email"}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 @router.post("/token")
 async def login(

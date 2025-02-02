@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from .app.config import settings
 import os
 from fastapi.staticfiles import StaticFiles
 from app.routes import auth, super_admin, admin, agent, work, companies
@@ -62,7 +61,11 @@ app.include_router(email_router, prefix="/api")
 # Configuration CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://app.tag-appore.com/"],  # À configurer avec les domaines autorisés en production
+    allow_origins=[
+        "https://app.tag-appore.com",  # Sans le slash final
+        "https://agenda-v2-backend.onrender.com",  # Sans le slash final
+        "http://localhost:3000"  # Pour le développement local
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -92,7 +95,7 @@ app.include_router(agent.router, prefix="/api", tags=["agent"])
 app.include_router(work.router, prefix="/api", tags=["work"])
 
 # Configuration des fichiers statiques
-STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../static")
+STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "static")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Events de démarrage et d'arrêt

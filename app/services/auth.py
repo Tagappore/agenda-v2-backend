@@ -7,6 +7,10 @@ from ..models.user import UserInDB, UserCreate, UserRole, User
 from ..config import settings
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
+import random
+from datetime import datetime
+
+
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -232,6 +236,47 @@ class AuthService:
             }
         }
     
+
+    async def reset_password(self, email: str) -> str:
+        """
+        Réinitialise le mot de passe d'un utilisateur ou d'une entreprise
+        et renvoie le nouveau mot de passe
+        """
+        # Générer un nouveau mot de passe aléatoire
+        new_password = ''.join(random.choices('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=12))
+        
+        # Chercher d'abord dans les users (agents)
+        user = await self.db.users.find_one({"email": email})
+        if user:
+            # Mise à jour du mot de passe pour un utilisateur
+            await self.db.users.update_one(
+                {"email": email},
+                {"$set": {
+                    "hashed_password": self.get_password_hash(new_password),
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+            return new_password
+
+        # Si non trouvé dans users, chercher dans companies
+        company = await self.db.companies.find_one({"email": email})
+        if company:
+            # Mise à jour du mot de passe pour une entreprise
+            await self.db.companies.update_one(
+                {"email": email},
+                {"$set": {
+                    "password": new_password,  # Pour les entreprises, on stocke en clair
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+            return new_password
+        
+        raise HTTPException(
+            status_code=404,
+            detail="Aucun utilisateur trouvé avec cet email"
+        )
+
+
     async def cascade_deactivate_admin(self, admin_id: str):
         """Désactive un admin et tous ses utilisateurs associés"""
         try:
