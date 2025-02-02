@@ -3,6 +3,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import asyncio
 from fastapi.staticfiles import StaticFiles
 from app.routes import auth, super_admin, admin, agent, work, companies
 from app.config import settings
@@ -13,26 +14,53 @@ from typing import Dict
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
+        self.reconnect_attempts: Dict[str, int] = {}
+        self.heartbeat_tasks: Dict[str, asyncio.Task] = {}
+        self.max_reconnect_attempts = settings.ws_max_reconnect_attempts
+        self.heartbeat_interval = settings.ws_heartbeat_interval
+        self.connection_timeout = settings.ws_connection_timeout
+
+    async def heartbeat(self, client_id: str):
+        """Tâche de heartbeat pour maintenir la connexion active"""
+        while client_id in self.active_connections:
+            try:
+                await asyncio.sleep(self.heartbeat_interval)
+                await self.active_connections[client_id].send_json({"type": "ping"})
+            except Exception:
+                await self.disconnect(client_id)
+                break
 
     async def connect(self, client_id: str, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections[client_id] = websocket
+        try:
+            await websocket.accept()
+            self.active_connections[client_id] = websocket
+            self.reconnect_attempts[client_id] = 0
+            
+            # Démarrer la tâche de heartbeat
+            self.heartbeat_tasks[client_id] = asyncio.create_task(
+                self.heartbeat(client_id)
+            )
+            
+            print(f"Client {client_id} connecté")
+        except Exception as e:
+            print(f"Erreur lors de la connexion de {client_id}: {str(e)}")
+            await self.disconnect(client_id)
 
-    def disconnect(self, client_id: str):
+    async def disconnect(self, client_id: str):
         if client_id in self.active_connections:
-            del self.active_connections[client_id]
+            # Annuler la tâche de heartbeat
+            if client_id in self.heartbeat_tasks:
+                self.heartbeat_tasks[client_id].cancel()
+                del self.heartbeat_tasks[client_id]
 
-    async def send_deactivation_message(self, company_id: str):
-        """Envoie un message de désactivation à tous les clients connectés d'une entreprise"""
-        for client_id, websocket in self.active_connections.items():
-            if client_id.startswith(f"company_{company_id}"):
-                try:
-                    await websocket.send_json({
-                        "type": "deactivation",
-                        "message": "Votre compte a été désactivé"
-                    })
-                except:
-                    await self.disconnect(client_id)
+            # Fermer la connexion WebSocket
+            try:
+                await self.active_connections[client_id].close()
+            except Exception:
+                pass
+
+            del self.active_connections[client_id]
+            print(f"Client {client_id} déconnecté")
 
 manager = ConnectionManager()
 
@@ -76,14 +104,22 @@ app.add_middleware(
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await manager.connect(client_id, websocket)
+    
     try:
         while True:
-            data = await websocket.receive_json()
-            # Garder la connexion active et traiter les messages si nécessaire
-    except WebSocketDisconnect:
-        manager.disconnect(client_id)
-    except Exception as e:
-        print(f"WebSocket error: {str(e)}")
+            try:
+                data = await websocket.receive_json()
+                # Répondre aux pings pour maintenir la connexion
+                if data.get("type") == "ping":
+                    await websocket.send_json({"type": "pong"})
+                # Traiter d'autres messages si nécessaire
+            except WebSocketDisconnect:
+                print(f"WebSocket déconnecté normalement pour {client_id}")
+                break
+            except Exception as e:
+                print(f"Erreur WebSocket pour {client_id}: {str(e)}")
+                break
+    finally:
         manager.disconnect(client_id)
 
 # Include routers
