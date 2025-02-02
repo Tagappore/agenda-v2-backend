@@ -1,14 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
-import datetime
 from fastapi import Form
-from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from ..services.auth import AuthService
 from ..models.user import UserCreate, User
 from ..config import settings
-from datetime import timedelta,timezone
+from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
