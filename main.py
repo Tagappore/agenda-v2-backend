@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from .app.config import settings
 import os
 from fastapi.staticfiles import StaticFiles
 from app.routes import auth, super_admin, admin, agent, work, companies
