@@ -91,7 +91,7 @@ app.include_router(agent.router, prefix="/api", tags=["agent"])
 app.include_router(work.router, prefix="/api", tags=["work"])
 
 # Configuration des fichiers statiques
-STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../static")
+STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "static")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # Events de démarrage et d'arrêt
