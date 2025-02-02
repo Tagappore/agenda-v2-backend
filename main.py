@@ -61,7 +61,11 @@ app.include_router(email_router, prefix="/api")
 # Configuration CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://app.tag-appore.com/"],  # À configurer avec les domaines autorisés en production
+    allow_origins=[
+        "https://app.tag-appore.com",  # Sans le slash final
+        "https://agenda-v2-backend.onrender.com",  # Sans le slash final
+        "http://localhost:3000"  # Pour le développement local
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
