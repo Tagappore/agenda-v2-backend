@@ -1,5 +1,3 @@
-# backend/app/__init__.py
-from . import config
-from . import models
-from . import routes
-from . import services
+from main import app, notify_company_deactivation
+
+__all__ = ['app', 'notify_company_deactivation']
