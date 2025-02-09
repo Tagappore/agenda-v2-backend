@@ -131,7 +131,7 @@ app.include_router(super_admin.router, prefix="/api", tags=["super-admin"])
 app.include_router(admin.router, prefix="/api", tags=["admin"])
 app.include_router(agent.router, prefix="/api", tags=["agent"])
 app.include_router(work.router, prefix="/api", tags=["work"])
-app.include_router(technician.router, prefix="/api", tags=["technician"])
+app.include_router(technician.router, prefix="/api", tags=["technicians"])
 
 # Configuration des fichiers statiques
 STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "static")
