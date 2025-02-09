@@ -1,12 +1,45 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from pydantic import BaseModel, EmailStr, constr
+from enum import Enum
 from .auth import verify_admin
 from app.config.database import get_database
 from bson import ObjectId
 from datetime import datetime
 
 router = APIRouter(tags=["prospects"])
+
+class ProcessingStatus(str, Enum):
+    NEW = "new"
+    PROCESSING = "processing"
+    APPOINTMENT = "appointment"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+class HousingType(str, Enum):
+    HOUSE = "house"
+    APARTMENT = "apartment"
+
+class OccupancyStatus(str, Enum):
+    OWNER = "owner"
+    TENANT = "tenant"
+    HOSTED = "hosted"
+
+class ProspectBase(BaseModel):
+    first_name: str
+    last_name: str
+    email: EmailStr
+    address: str
+    city: str
+    postal_code: str
+    housing_type: HousingType
+    status: OccupancyStatus
+    age: Optional[int] = None
+    annual_income: int
+    comments: Optional[str] = None
+    call_center_name: Optional[str] = None
+    processing_status: ProcessingStatus = ProcessingStatus.NEW
 
 def format_prospect_response(prospect: Dict[str, Any]) -> Dict[str, Any]:
     """Formate la réponse du prospect de manière cohérente"""
@@ -24,6 +57,8 @@ def format_prospect_response(prospect: Dict[str, Any]) -> Dict[str, Any]:
         "annual_income": prospect.get("annual_income", 0),
         "comments": prospect.get("comments", ""),
         "company_id": prospect.get("company_id", ""),
+        "call_center_name": prospect.get("call_center_name", ""),
+        "processing_status": prospect.get("processing_status", "new"),
         "created_at": prospect.get("created_at", datetime.utcnow()),
         "updated_at": prospect.get("updated_at", datetime.utcnow())
     }
@@ -55,6 +90,9 @@ async def create_prospect(
         if await db.prospects.find_one({"email": prospect_data["email"]}):
             raise HTTPException(status_code=409, detail="Email déjà utilisé")
 
+        # Valider et définir le statut de traitement par défaut
+        prospect_data["processing_status"] = "new"
+        
         # Créer le prospect
         prospect_data["company_id"] = current_user["company_id"]
         prospect_data["created_at"] = datetime.utcnow()
@@ -117,6 +155,14 @@ async def update_prospect(
             })
             if email_exists:
                 raise HTTPException(status_code=409, detail="Email déjà utilisé")
+
+        # Valider le statut de traitement
+        if "processing_status" in prospect_data:
+            if prospect_data["processing_status"] not in [status.value for status in ProcessingStatus]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Statut de traitement invalide. Valeurs possibles: {[s.value for s in ProcessingStatus]}"
+                )
 
         # Mettre à jour les données
         prospect_data["updated_at"] = datetime.utcnow()
