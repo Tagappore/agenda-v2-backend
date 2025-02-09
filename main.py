@@ -11,7 +11,7 @@ from app.routes.email import router as email_router
 from typing import Dict
 from app.routes import technician
 from app.routes import call_center
-from app.routes import prospects
+from app.routes import prospect
 
 # Gestionnaire des connexions WebSocket
 class ConnectionManager:
@@ -134,7 +134,7 @@ app.include_router(agent.router, prefix="/api", tags=["agent"])
 app.include_router(work.router, prefix="/api", tags=["work"])
 app.include_router(technician.router, prefix="/api", tags=["technicians"])
 app.include_router(call_center.router, prefix="/api", tags=["call_centers"])
-app.include_router(prospects.router, prefix="/api", tags=["Prospects"])
+app.include_router(prospect.router, prefix="/api", tags=["prospects"])
 
 # Configuration des fichiers statiques
 STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "static")
