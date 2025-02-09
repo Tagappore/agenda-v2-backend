@@ -9,6 +9,8 @@ from app.routes import auth, super_admin, admin, agent, work, companies
 from app.config import settings
 from app.routes.email import router as email_router
 from typing import Dict
+from app.routes import technician
+
 
 # Gestionnaire des connexions WebSocket
 class ConnectionManager:
@@ -129,10 +131,12 @@ app.include_router(super_admin.router, prefix="/api", tags=["super-admin"])
 app.include_router(admin.router, prefix="/api", tags=["admin"])
 app.include_router(agent.router, prefix="/api", tags=["agent"])
 app.include_router(work.router, prefix="/api", tags=["work"])
+app.include_router(technician.router, prefix="/api", tags=["technician"])
 
 # Configuration des fichiers statiques
 STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "static")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 
 # Events de démarrage et d'arrêt
 @app.on_event("startup")
