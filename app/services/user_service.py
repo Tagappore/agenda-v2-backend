@@ -149,6 +149,8 @@ class UserService:
         }
 
         return role_hierarchy[modifier_role] > role_hierarchy[target_role]
+    
+    
 
     async def _log_action(self, user_id: str, action: str):
         """Enregistre une action dans les logs"""
@@ -178,3 +180,29 @@ class UserService:
             hierarchy["created_users"].append(sub_hierarchy)
 
         return hierarchy
+    
+    async def check_email_availability(self, email: str) -> bool:
+        """
+        Vérifie si l'email est déjà utilisé par n'importe quel type d'utilisateur
+        Retourne True si l'email est disponible, False sinon
+        """
+        # Vérifier dans la collection users
+        existing_user = await self.collection.find_one({"email": email})
+        if existing_user:
+            return False
+
+        # Si l'email est libre, retourner True
+        return True
+
+    async def create_user(self, creator_id: str, user_data: UserCreate) -> UserInDB:
+        # Vérifier que le créateur existe
+        creator = await self.collection.find_one({"_id": ObjectId(creator_id)})
+        if not creator:
+            raise ValueError("Creator not found")
+
+        # Vérifier les permissions en fonction du rôle du créateur
+        await self._verify_creation_permissions(creator["role"], user_data.role)
+
+        # Vérifier si l'email est disponible
+        if not await self.check_email_availability(user_data.email):
+            raise ValueError("Cette adresse email est déjà utilisée par un autre utilisateur (agent, technicien, admin ou call center). Veuillez en choisir une autre.")
