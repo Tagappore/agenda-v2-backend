@@ -94,6 +94,20 @@ class UserService:
             )
 
         update_data = user_update.dict(exclude_unset=True)
+        
+        # Vérifier l'email uniquement s'il est modifié
+        if "email" in update_data and update_data["email"] != target_user.email:
+            # Vérifier dans les utilisateurs (excluant l'utilisateur actuel)
+            existing_user = await self.collection.find_one({
+                "email": update_data["email"],
+                "_id": {"$ne": ObjectId(user_id)}
+            })
+            # Vérifier dans les entreprises
+            existing_company = await self.db.companies.find_one({"email": update_data["email"]})
+            
+            if existing_user or existing_company:
+                raise ValueError("Cette adresse email est déjà utilisée par une autre entreprise ou un utilisateur (agent, technicien, admin ou call center). Veuillez en choisir une autre.")
+
         if "password" in update_data:
             update_data["hashed_password"] = self.get_password_hash(
                 update_data.pop("password")
@@ -191,7 +205,12 @@ class UserService:
         if existing_user:
             return False
 
-        # Si l'email est libre, retourner True
+        # Vérifier dans la collection companies
+        existing_company = await self.db.companies.find_one({"email": email})
+        if existing_company:
+            return False
+
+        # Si l'email est libre dans les deux collections, retourner True
         return True
 
     async def create_user(self, creator_id: str, user_data: UserCreate) -> UserInDB:

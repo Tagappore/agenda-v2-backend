@@ -76,8 +76,14 @@ async def create_technician(
 ):
     try:
         # Vérifier si l'email existe déjà
-        if await db.users.find_one({"email": email}):
-            raise HTTPException(status_code=409, detail="Email déjà utilisé")
+        existing_user = await db.users.find_one({"email": email})
+        existing_company = await db.companies.find_one({"email": email})
+
+        if existing_user or existing_company:
+            raise HTTPException(
+                status_code=409, 
+                detail="Cette adresse email est déjà utilisée par une autre entreprise ou un utilisateur (agent, technicien, admin ou call center). Veuillez en choisir une autre."
+            )
 
         # Générer username et password
         base_username = f"{first_name.lower()}.{last_name.lower()}".replace(" ", "")
@@ -198,12 +204,17 @@ async def update_technician(
 
         # Vérifier l'email unique
         if email != existing_technician["email"]:
-            email_exists = await db.users.find_one({
+            existing_email_user = await db.users.find_one({
                 "email": email,
                 "_id": {"$ne": technician_oid}
             })
-            if email_exists:
-                raise HTTPException(status_code=409, detail="Email déjà utilisé")
+            existing_email_company = await db.companies.find_one({"email": email})
+            
+            if existing_email_user or existing_email_company:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Cette adresse email est déjà utilisée par une autre entreprise ou un utilisateur (agent, technicien, admin ou call center). Veuillez en choisir une autre."
+                )
 
         # Gérer la photo
         photo_path = existing_technician.get("photo")

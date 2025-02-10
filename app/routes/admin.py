@@ -142,6 +142,15 @@ async def create_agent(
     agent_data.role = UserRole.AGENT  # S'assurer que c'est bien un agent
     
     try:
+        # Vérifier si l'email existe déjà
+        existing_user = await auth_service.db.users.find_one({"email": agent_data.email})
+        existing_company = await auth_service.db.companies.find_one({"email": agent_data.email})
+        
+        if existing_user or existing_company:
+            raise ValueError(
+                "Cette adresse email est déjà utilisée par une autre entreprise ou un utilisateur (agent, technicien, admin ou call center). Veuillez en choisir une autre."
+            )
+            
         return await auth_service.create_agent(agent_data)
     except ValueError as e:
         raise HTTPException(
