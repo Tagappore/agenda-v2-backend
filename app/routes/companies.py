@@ -160,7 +160,7 @@ async def send_credentials(data: dict):
         msg.attach(MIMEText(body, 'plain'))
         
         # Correction de la configuration SMTP pour O2switch
-        with smtplib.SMTP_SSL('vautour.o2switch.net', 465) as server:
+        with smtplib.SMTP_SSL('app.tag-appore.com', 465) as server:
             server.login(sender_email, smtp_password)
             server.send_message(msg)
             

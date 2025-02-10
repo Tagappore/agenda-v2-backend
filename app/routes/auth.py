@@ -90,7 +90,7 @@ async def reset_password(
         msg.attach(MIMEText(body, 'plain'))
         
         # Envoyer l'email via O2switch
-        with smtplib.SMTP_SSL('vautour.o2switch.net', 465) as server:
+        with smtplib.SMTP_SSL('app.tag-appore.com', 465) as server:
             server.login(sender_email, smtp_password)
             server.send_message(msg)
             

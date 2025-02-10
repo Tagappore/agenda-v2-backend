@@ -39,7 +39,7 @@ async def send_email(
                 msg.attach(part)
         
         # Envoyer l'email via O2switch
-        with smtplib.SMTP_SSL('vautour.o2switch.net', 465) as server:
+        with smtplib.SMTP_SSL('app.tag-appore.com', 465) as server:
             server.login(sender_email, smtp_password)
             server.send_message(msg)
             
@@ -78,7 +78,7 @@ async def send_credentials(
         
         msg.attach(MIMEText(body, 'plain'))
         
-        with smtplib.SMTP_SSL('vautour.o2switch.net', 465) as server:
+        with smtplib.SMTP_SSL('app.tag-appore.com', 465) as server:
             server.login(sender_email, smtp_password)
             server.send_message(msg)
             
@@ -117,7 +117,7 @@ async def send_password_reset(
         
         msg.attach(MIMEText(body, 'plain'))
         
-        with smtplib.SMTP_SSL('vautour.o2switch.net', 465) as server:
+        with smtplib.SMTP_SSL('app.tag-appore.com', 465) as server:
             server.login(sender_email, smtp_password)
             server.send_message(msg)
             
