@@ -18,8 +18,8 @@ async def send_email(
 ):
     try:
         # Configuration email
-        sender_email = "contact@tag-appore.com"
-        smtp_password = ",4)%vdrnYDPq"
+        sender_email = "support@app.tag-appore.com"
+        smtp_password = "FyrJXhtT21A}"
         
         # Créer le message
         msg = MIMEMultipart()
@@ -57,8 +57,8 @@ async def send_credentials(
 ):
     try:
         # Configuration email
-        sender_email = "contact@tag-appore.com"
-        smtp_password = ",4)%vdrnYDPq"
+        sender_email = "support@app.tag-appore.com"
+        smtp_password = "FyrJXhtT21A}"
         
         # Créer le message
         msg = MIMEMultipart()
@@ -94,8 +94,8 @@ async def send_password_reset(
 ):
     try:
         # Configuration email
-        sender_email = "contact@tag-appore.com"
-        smtp_password = ",4)%vdrnYDPq"
+        sender_email = "support@app.tag-appore.com"
+        smtp_password = "FyrJXhtT21A}"
         
         # Créer le message
         msg = MIMEMultipart()

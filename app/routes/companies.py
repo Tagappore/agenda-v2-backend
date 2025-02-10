@@ -138,8 +138,8 @@ async def create_company(
 async def send_credentials(data: dict):
     try:
         # Configuration email
-        sender_email = "contact@tag-appore.com"
-        smtp_password = ",4)%vdrnYDPq"
+        sender_email = "support@app.tag-appore.com"
+        smtp_password = "FyrJXhtT21A}"
         
         # Créer le message
         msg = MIMEMultipart()
