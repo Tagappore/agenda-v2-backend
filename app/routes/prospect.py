@@ -68,17 +68,18 @@ def format_prospect_response(prospect: Dict[str, Any]) -> Dict[str, Any]:
 # Dans prospect.py, ajouter/modifier :
 
 # La route de recherche que nous avons ajoutée :
-@router.get("/prospects/search", response_model=List[Dict[str, Any]])
+@router.get("/prospects/search")
 async def search_prospects(
     query: str,
     current_user: dict = Depends(verify_admin),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     try:
-        # Créer une expression régulière pour la recherche insensible à la casse
+        # Ajouter un print pour déboguer
+        print(f"Recherche de prospects avec query: {query}")
+        
         search_regex = {"$regex": query, "$options": "i"}
         
-        # Rechercher dans first_name et last_name
         prospects = await db.prospects.find({
             "company_id": current_user["company_id"],
             "$or": [
@@ -87,7 +88,25 @@ async def search_prospects(
             ]
         }).limit(10).to_list(10)
         
-        return [format_prospect_response(prospect) for prospect in prospects]
+        # Ajouter un print pour déboguer
+        print(f"Prospects trouvés: {prospects}")
+        
+        # S'assurer que les champs sont correctement formatés
+        formatted_prospects = []
+        for prospect in prospects:
+            formatted_prospect = {
+                "id": str(prospect["_id"]),
+                "first_name": prospect.get("first_name", ""),
+                "last_name": prospect.get("last_name", ""),
+                "email": prospect.get("email", ""),
+                "address": prospect.get("address", ""),
+                "city": prospect.get("city", ""),
+                "postal_code": prospect.get("postal_code", ""),
+                "phone": prospect.get("phone", ""),
+            }
+            formatted_prospects.append(formatted_prospect)
+        
+        return formatted_prospects
         
     except Exception as e:
         print(f"Erreur lors de la recherche des prospects: {str(e)}")
