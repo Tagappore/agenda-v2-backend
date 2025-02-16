@@ -187,6 +187,7 @@ async def update_technician(
     address: str = Form(...),
     city: str = Form(...),
     postal_code: str = Form(...),
+    departments: str = Form(...),  # Nouveau champ
     photo: Optional[UploadFile] = File(None),
     current_user: dict = Depends(verify_admin),
     db: AsyncIOMotorDatabase = Depends(get_database)
@@ -241,6 +242,7 @@ async def update_technician(
             "address": address,
             "city": city,
             "postal_code": postal_code,
+            "departments": departments.split(','), # Conversion de la chaîne en liste
             "photo": photo_path,
             "updated_at": datetime.utcnow()
         }
