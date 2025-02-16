@@ -65,6 +65,9 @@ def format_prospect_response(prospect: Dict[str, Any]) -> Dict[str, Any]:
 
 # Dans prospect.py, ajouter cette nouvelle route :
 
+# Dans prospect.py, ajouter/modifier :
+
+# La route de recherche que nous avons ajoutée :
 @router.get("/prospects/search", response_model=List[Dict[str, Any]])
 async def search_prospects(
     query: str,
