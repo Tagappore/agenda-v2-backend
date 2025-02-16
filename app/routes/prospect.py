@@ -63,6 +63,33 @@ def format_prospect_response(prospect: Dict[str, Any]) -> Dict[str, Any]:
         "updated_at": prospect.get("updated_at", datetime.utcnow())
     }
 
+# Dans prospect.py, ajouter cette nouvelle route :
+
+@router.get("/prospects/search", response_model=List[Dict[str, Any]])
+async def search_prospects(
+    query: str,
+    current_user: dict = Depends(verify_admin),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    try:
+        # Créer une expression régulière pour la recherche insensible à la casse
+        search_regex = {"$regex": query, "$options": "i"}
+        
+        # Rechercher dans first_name et last_name
+        prospects = await db.prospects.find({
+            "company_id": current_user["company_id"],
+            "$or": [
+                {"first_name": search_regex},
+                {"last_name": search_regex}
+            ]
+        }).limit(10).to_list(10)
+        
+        return [format_prospect_response(prospect) for prospect in prospects]
+        
+    except Exception as e:
+        print(f"Erreur lors de la recherche des prospects: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/prospects", response_model=List[Dict[str, Any]])
 async def get_prospects(
     current_user: dict = Depends(verify_admin),
