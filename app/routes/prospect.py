@@ -71,20 +71,31 @@ async def search_prospects(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     try:
-        # Ajouter un print pour déboguer
-        print(f"Recherche de prospects avec query: {query}")
+        # Nettoyage et préparation de la requête
+        query = query.strip()
+        if not query:
+            return JSONResponse(content=[], headers={"Access-Control-Allow-Origin": "*"})
+
+        # Création d'une expression régulière plus permissive
+        search_regex = {"$regex": f".*{query}.*", "$options": "i"}
         
-        search_regex = {"$regex": query, "$options": "i"}
-        
+        # Recherche étendue
         prospects = await db.prospects.find({
             "company_id": current_user["company_id"],
             "$or": [
                 {"first_name": search_regex},
-                {"last_name": search_regex}
+                {"last_name": search_regex},
+                {"email": search_regex},
+                {"postal_code": search_regex},
+                {"city": search_regex},
+                {"address": search_regex}
             ]
-        }).limit(10).to_list(10)
+        }).sort("last_name", 1).limit(10).to_list(10)
         
-        # Formater la réponse
+        # Log pour le débogage
+        print(f"Nombre de prospects trouvés: {len(prospects)}")
+        
+        # Formater la réponse avec plus d'informations
         formatted_prospects = []
         for prospect in prospects:
             formatted_prospect = {
@@ -95,7 +106,8 @@ async def search_prospects(
                 "address": prospect.get("address", ""),
                 "city": prospect.get("city", ""),
                 "postal_code": prospect.get("postal_code", ""),
-                "phone": prospect.get("phone", "")
+                "phone": prospect.get("phone", ""),
+                "processing_status": prospect.get("processing_status", "new")
             }
             formatted_prospects.append(formatted_prospect)
         
@@ -103,13 +115,17 @@ async def search_prospects(
             content=formatted_prospects,
             headers={
                 "Access-Control-Allow-Origin": "*",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Cache-Control": "no-cache"
             }
         )
         
     except Exception as e:
-        print(f"Erreur lors de la recherche des prospects: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Erreur détaillée lors de la recherche des prospects: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Erreur lors de la recherche des prospects: {str(e)}"
+        )
 
 @router.get("/prospects", response_model=List[Dict[str, Any]])
 async def get_prospects(
