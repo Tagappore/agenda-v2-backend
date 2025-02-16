@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from typing import List, Dict, Any, Optional
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, EmailStr, constr
@@ -63,12 +64,7 @@ def format_prospect_response(prospect: Dict[str, Any]) -> Dict[str, Any]:
         "updated_at": prospect.get("updated_at", datetime.utcnow())
     }
 
-# Dans prospect.py, ajouter cette nouvelle route :
-
-# Dans prospect.py, ajouter/modifier :
-
-# La route de recherche que nous avons ajoutée :
-@router.get("/prospects/search")
+@router.get("/prospects/search", response_model=List[Dict[str, Any]])
 async def search_prospects(
     query: str,
     current_user: dict = Depends(verify_admin),
@@ -88,10 +84,7 @@ async def search_prospects(
             ]
         }).limit(10).to_list(10)
         
-        # Ajouter un print pour déboguer
-        print(f"Prospects trouvés: {prospects}")
-        
-        # S'assurer que les champs sont correctement formatés
+        # Formater la réponse
         formatted_prospects = []
         for prospect in prospects:
             formatted_prospect = {
@@ -102,11 +95,17 @@ async def search_prospects(
                 "address": prospect.get("address", ""),
                 "city": prospect.get("city", ""),
                 "postal_code": prospect.get("postal_code", ""),
-                "phone": prospect.get("phone", ""),
+                "phone": prospect.get("phone", "")
             }
             formatted_prospects.append(formatted_prospect)
         
-        return formatted_prospects
+        return JSONResponse(
+            content=formatted_prospects,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Content-Type": "application/json"
+            }
+        )
         
     except Exception as e:
         print(f"Erreur lors de la recherche des prospects: {str(e)}")
