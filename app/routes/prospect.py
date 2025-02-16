@@ -71,45 +71,61 @@ async def search_prospects(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     try:
-        # Nettoyage et préparation de la requête
-        query = query.strip()
-        if not query:
-            return JSONResponse(content=[], headers={"Access-Control-Allow-Origin": "*"})
+        # Logs détaillés pour le débogage
+        print("=== Début de la recherche de prospects ===")
+        print(f"Query reçue: '{query}'")
+        print(f"Company ID de l'utilisateur: {current_user.get('company_id')}")
 
-        # Création d'une expression régulière plus permissive
+        # Nettoyage de la requête
+        query = query.strip()
         search_regex = {"$regex": f".*{query}.*", "$options": "i"}
         
-        # Recherche étendue
-        prospects = await db.prospects.find({
+        # Construire la requête MongoDB
+        search_query = {
             "company_id": current_user["company_id"],
             "$or": [
                 {"first_name": search_regex},
-                {"last_name": search_regex},
-                {"email": search_regex},
-                {"postal_code": search_regex},
-                {"city": search_regex},
-                {"address": search_regex}
+                {"last_name": search_regex}
             ]
-        }).sort("last_name", 1).limit(10).to_list(10)
+        }
         
-        # Log pour le débogage
-        print(f"Nombre de prospects trouvés: {len(prospects)}")
+        print("Requête MongoDB:", search_query)
+
+        # Exécuter la recherche
+        prospects = await db.prospects.find(search_query).limit(10).to_list(10)
         
-        # Formater la réponse avec plus d'informations
-        formatted_prospects = []
-        for prospect in prospects:
-            formatted_prospect = {
-                "id": str(prospect["_id"]),
-                "first_name": prospect.get("first_name", ""),
-                "last_name": prospect.get("last_name", ""),
-                "email": prospect.get("email", ""),
-                "address": prospect.get("address", ""),
-                "city": prospect.get("city", ""),
-                "postal_code": prospect.get("postal_code", ""),
-                "phone": prospect.get("phone", ""),
-                "processing_status": prospect.get("processing_status", "new")
-            }
-            formatted_prospects.append(formatted_prospect)
+        print(f"Nombre de résultats trouvés: {len(prospects)}")
+        if len(prospects) > 0:
+            print("Premier résultat:", prospects[0])
+        else:
+            # Vérifier s'il y a des prospects pour cette company_id
+            total_prospects = await db.prospects.count_documents({"company_id": current_user["company_id"]})
+            print(f"Nombre total de prospects pour cette company: {total_prospects}")
+            
+            # Rechercher sans le filtre company_id pour déboguer
+            all_matches = await db.prospects.find({
+                "$or": [
+                    {"first_name": search_regex},
+                    {"last_name": search_regex}
+                ]
+            }).to_list(10)
+            print(f"Résultats sans filtre company_id: {len(all_matches)}")
+            if len(all_matches) > 0:
+                print("Company IDs trouvées:", [p.get("company_id") for p in all_matches])
+
+        print("=== Fin de la recherche ===")
+        
+        # Formater la réponse
+        formatted_prospects = [{
+            "id": str(prospect["_id"]),
+            "first_name": prospect.get("first_name", ""),
+            "last_name": prospect.get("last_name", ""),
+            "email": prospect.get("email", ""),
+            "address": prospect.get("address", ""),
+            "city": prospect.get("city", ""),
+            "postal_code": prospect.get("postal_code", ""),
+            "phone": prospect.get("phone", "")
+        } for prospect in prospects]
         
         return JSONResponse(
             content=formatted_prospects,
@@ -121,11 +137,9 @@ async def search_prospects(
         )
         
     except Exception as e:
-        print(f"Erreur détaillée lors de la recherche des prospects: {str(e)}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Erreur lors de la recherche des prospects: {str(e)}"
-        )
+        print(f"Erreur lors de la recherche: {str(e)}")
+        print(f"Type d'erreur: {type(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/prospects", response_model=List[Dict[str, Any]])
 async def get_prospects(
