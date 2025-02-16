@@ -21,7 +21,6 @@ def generate_password(length=12):
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 def format_technician_response(technician: Dict[str, Any], include_password: bool = False) -> Dict[str, Any]:
-    """Formate la réponse du technicien de manière cohérente"""
     formatted_technician = {
         "id": str(technician.get("_id", "")),
         "first_name": technician.get("first_name", ""),
@@ -32,6 +31,7 @@ def format_technician_response(technician: Dict[str, Any], include_password: boo
         "address": technician.get("address", ""),
         "city": technician.get("city", ""),
         "postal_code": technician.get("postal_code", ""),
+        "departments": technician.get("departments", []),  # Nouveau champ
         "photo": technician.get("photo"),
         "role": technician.get("role", "technician"),
         "is_active": technician.get("is_active", True),
@@ -70,6 +70,7 @@ async def create_technician(
     address: str = Form(...),
     city: str = Form(...),
     postal_code: str = Form(...),
+    departments: str = Form(...),  # Nouveau champ
     photo: Optional[UploadFile] = File(None),
     current_user: dict = Depends(verify_admin),
     db: AsyncIOMotorDatabase = Depends(get_database)
@@ -121,6 +122,7 @@ async def create_technician(
             "city": city,
             "postal_code": postal_code,
             "photo": photo_path,
+            "departments": departments.split(','),  # Conversion de la chaîne en liste
             "role": "technician",
             "is_active": True,
             "hashed_password": hashed_password,
