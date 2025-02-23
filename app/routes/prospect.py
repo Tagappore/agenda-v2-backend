@@ -30,6 +30,8 @@ class OccupancyStatus(str, Enum):
 class ProspectBase(BaseModel):
     first_name: str
     last_name: str
+    phone_home: Optional[str] = None
+    phone_mobile: Optional[str] = None
     email: EmailStr
     address: str
     city: str
@@ -48,6 +50,8 @@ def format_prospect_response(prospect: Dict[str, Any]) -> Dict[str, Any]:
         "id": str(prospect.get("_id", "")),
         "first_name": prospect.get("first_name", ""),
         "last_name": prospect.get("last_name", ""),
+        "phone_home": prospect.get("phone_home", ""),
+        "phone_mobile": prospect.get("phone_mobile", ""),
         "email": prospect.get("email", ""),
         "address": prospect.get("address", ""),
         "city": prospect.get("city", ""),
