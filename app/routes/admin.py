@@ -29,8 +29,7 @@ async def create_user(
 @router.get("/users", response_model=List[User])
 async def get_users(
     current_user: User = Depends(verify_admin),
-    auth_service: AuthService = Depends(get_auth_service)
-):
+    auth_service: AuthService = Depends(get_auth_service)):
     # Get both agent and work users
     agents = await auth_service.get_users_by_role("agent")
     workers = await auth_service.get_users_by_role("work")
@@ -113,53 +112,35 @@ async def toggle_user_status(
 
 @router.get("/dashboard/stats")
 async def get_dashboard_stats(
-    current_user: dict = Depends(verify_admin),
+    current_user: User = Depends(verify_admin),
     auth_service: AuthService = Depends(get_auth_service)
 ):
-    try:
-        # Statistiques globales qui ne nécessitent pas de company_id
-        stats = {
-            # Statistiques des utilisateurs
-            "total_agents": await auth_service.count_users_by_role("agent"),
-            "total_technicians": await auth_service.count_users_by_role("work"),
-            "total_call_centers": await auth_service.count_users_by_role("call_center"),
-            "active_agents": await auth_service.count_active_users_by_role("agent"),
-            "active_technicians": await auth_service.count_active_users_by_role("work"),
-            "active_call_centers": await auth_service.count_active_users_by_role("call_center"),
-        }
+    stats = {
+        # Statistiques des utilisateurs
+        "total_agents": await auth_service.count_users_by_role("agent"),
+        "total_technicians": await auth_service.count_users_by_role("work"),
+        "total_call_centers": await auth_service.count_users_by_role("call_center"),
+        "active_agents": await auth_service.count_active_users_by_role("agent"),
+        "active_technicians": await auth_service.count_active_users_by_role("work"),
+        "active_call_centers": await auth_service.count_active_users_by_role("call_center"),
 
-        # Statistiques spécifiques à l'entreprise
-        if "company_id" in current_user and current_user["company_id"]:
-            company_stats = {
-                "total_appointments": await auth_service.count_total_appointments(current_user["company_id"]),
-                "pending_appointments": await auth_service.count_pending_appointments(current_user["company_id"]),
-                "todays_appointments": await auth_service.count_todays_appointments(current_user["company_id"]),
-                "total_calls": 0,  # Temporairement à 0
-                "todays_calls": 0,  # Temporairement à 0
-                "total_prospects": await auth_service.count_total_prospects(current_user["company_id"]),
-                "completion_rate": await auth_service.calculate_completion_rate(current_user["company_id"])
-            }
-            stats.update(company_stats)
-        else:
-            # Valeurs par défaut si pas de company_id
-            stats.update({
-                "total_appointments": 0,
-                "pending_appointments": 0,
-                "todays_appointments": 0,
-                "total_calls": 0,
-                "todays_calls": 0,
-                "total_prospects": 0,
-                "completion_rate": 0
-            })
+        # Statistiques des rendez-vous
+        "total_appointments": await auth_service.count_total_appointments(current_user.company_id),
+        "pending_appointments": await auth_service.count_pending_appointments(current_user.company_id),
+        "todays_appointments": await auth_service.count_todays_appointments(current_user.company_id),
 
-        return stats
+        # Statistiques des appels
+        "total_calls": await auth_service.count_total_calls(current_user.company_id),
+        "todays_calls": await auth_service.count_todays_calls(current_user.company_id),
 
-    except Exception as e:
-        print(f"Erreur lors de la récupération des statistiques: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erreur lors de la récupération des statistiques: {str(e)}"
-        )
+        # Statistiques des prospects
+        "total_prospects": await auth_service.count_total_prospects(current_user.company_id),
+
+        # Taux de réalisation
+        "completion_rate": await auth_service.calculate_completion_rate(current_user.company_id)
+    }
+
+    return stats
 
 
 @router.post("/agents", response_model=User)
