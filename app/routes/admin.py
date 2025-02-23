@@ -118,34 +118,42 @@ async def get_dashboard_stats(
 ):
     try:
         stats = {
-            # Statistiques des utilisateurs - wrapped in try/catch
+            # Statistiques des utilisateurs
             "total_agents": await auth_service.count_users_by_role("agent"),
             "total_technicians": await auth_service.count_users_by_role("work"),
             "total_call_centers": await auth_service.count_users_by_role("call_center"),
             "active_agents": await auth_service.count_active_users_by_role("agent"),
             "active_technicians": await auth_service.count_active_users_by_role("work"),
             "active_call_centers": await auth_service.count_active_users_by_role("call_center"),
-
-            # Statistiques des rendez-vous
-            "total_appointments": await auth_service.count_total_appointments(current_user.company_id),
-            "pending_appointments": await auth_service.count_pending_appointments(current_user.company_id),
-            "todays_appointments": await auth_service.count_todays_appointments(current_user.company_id),
-
-            # Statistiques des appels - temporairement fixées à 0
-            "total_calls": 0,  # En attendant la création de la collection calls
-            "todays_calls": 0,  # En attendant la création de la collection calls
-
-            # Statistiques des prospects
-            "total_prospects": await auth_service.count_total_prospects(current_user.company_id),
-
-            # Taux de réalisation
-            "completion_rate": await auth_service.calculate_completion_rate(current_user.company_id)
         }
+
+        # Ajouter les statistiques spécifiques à l'entreprise seulement si c'est un admin d'entreprise
+        if hasattr(current_user, 'company_id') and current_user.company_id:
+            stats.update({
+                "total_appointments": await auth_service.count_total_appointments(current_user.company_id),
+                "pending_appointments": await auth_service.count_pending_appointments(current_user.company_id),
+                "todays_appointments": await auth_service.count_todays_appointments(current_user.company_id),
+                "total_calls": 0,  # Temporairement à 0
+                "todays_calls": 0,  # Temporairement à 0
+                "total_prospects": await auth_service.count_total_prospects(current_user.company_id),
+                "completion_rate": await auth_service.calculate_completion_rate(current_user.company_id)
+            })
+        else:
+            # Pour les autres types d'admin, mettre des valeurs par défaut
+            stats.update({
+                "total_appointments": 0,
+                "pending_appointments": 0,
+                "todays_appointments": 0,
+                "total_calls": 0,
+                "todays_calls": 0,
+                "total_prospects": 0,
+                "completion_rate": 0
+            })
 
         return stats
 
     except Exception as e:
-        print(f"Error in dashboard stats: {str(e)}")  # Pour le debugging
+        print(f"Error in dashboard stats: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error fetching dashboard stats: {str(e)}"
