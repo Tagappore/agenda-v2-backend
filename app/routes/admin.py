@@ -5,7 +5,7 @@ from ..services.auth import AuthService
 from ..models.user import UserCreate, User, UserUpdate,AgentCreate,UserRole
 from .auth import verify_admin, get_auth_service
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin-user", tags=["admin"])
 
 @router.post("/users", response_model=User)
 async def create_user(
