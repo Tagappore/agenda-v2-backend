@@ -113,6 +113,73 @@ class AuthService:
     async def count_companies(self) -> int:
         return await self.db.companies.count_documents({})
     
+    async def count_active_users_by_role(self, role: str) -> int:
+        """Compte le nombre d'utilisateurs actifs par rôle"""
+        return await self.db.users.count_documents({
+            "role": role,
+            "is_active": True
+        })
+
+    async def count_total_appointments(self, company_id: str) -> int:
+        """Compte le nombre total de rendez-vous pour une entreprise"""
+        return await self.db.appointments.count_documents({
+            "company_id": company_id
+        })
+
+    async def count_pending_appointments(self, company_id: str) -> int:
+        """Compte le nombre de rendez-vous en attente pour une entreprise"""
+        return await self.db.appointments.count_documents({
+            "company_id": company_id,
+            "status": "pending"
+        })
+
+    async def count_todays_appointments(self, company_id: str) -> int:
+        """Compte le nombre de rendez-vous du jour pour une entreprise"""
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow = today + timedelta(days=1)
+        return await self.db.appointments.count_documents({
+            "company_id": company_id,
+            "date": {"$gte": today, "$lt": tomorrow}
+        })
+
+    async def count_total_calls(self, company_id: str) -> int:
+        """Compte le nombre total d'appels pour une entreprise"""
+        return await self.db.calls.count_documents({
+            "company_id": company_id
+        })
+
+    async def count_todays_calls(self, company_id: str) -> int:
+        """Compte le nombre d'appels du jour pour une entreprise"""
+        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow = today + timedelta(days=1)
+        return await self.db.calls.count_documents({
+            "company_id": company_id,
+            "date": {"$gte": today, "$lt": tomorrow}
+        })
+
+    async def count_total_prospects(self, company_id: str) -> int:
+        """Compte le nombre total de prospects pour une entreprise"""
+        return await self.db.prospects.count_documents({
+            "company_id": company_id
+        })
+
+    async def calculate_completion_rate(self, company_id: str) -> float:
+        """Calcule le taux de réalisation des rendez-vous pour une entreprise"""
+        total = await self.db.appointments.count_documents({
+            "company_id": company_id,
+            "status": {"$in": ["completed", "cancelled"]}
+        })
+        
+        if total == 0:
+            return 0.0
+            
+        completed = await self.db.appointments.count_documents({
+            "company_id": company_id,
+            "status": "completed"
+        })
+        
+        return round((completed / total) * 100, 2)
+    
     
 
     async def get_company_by_email(self, email: str) -> Optional[Dict[str, Any]]:

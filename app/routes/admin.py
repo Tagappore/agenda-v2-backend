@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
+import datetime
 from ..services.auth import AuthService
 from ..models.user import UserCreate, User, UserUpdate,AgentCreate,UserRole
 from .auth import verify_admin, get_auth_service
@@ -116,11 +117,30 @@ async def get_dashboard_stats(
     auth_service: AuthService = Depends(get_auth_service)
 ):
     stats = {
+        # Statistiques des utilisateurs
         "total_agents": await auth_service.count_users_by_role("agent"),
-        "total_workers": await auth_service.count_users_by_role("work"),
+        "total_technicians": await auth_service.count_users_by_role("work"),
+        "total_call_centers": await auth_service.count_users_by_role("call_center"),
         "active_agents": await auth_service.count_active_users_by_role("agent"),
-        "active_workers": await auth_service.count_active_users_by_role("work")
+        "active_technicians": await auth_service.count_active_users_by_role("work"),
+        "active_call_centers": await auth_service.count_active_users_by_role("call_center"),
+
+        # Statistiques des rendez-vous
+        "total_appointments": await auth_service.count_total_appointments(current_user.company_id),
+        "pending_appointments": await auth_service.count_pending_appointments(current_user.company_id),
+        "todays_appointments": await auth_service.count_todays_appointments(current_user.company_id),
+
+        # Statistiques des appels
+        "total_calls": await auth_service.count_total_calls(current_user.company_id),
+        "todays_calls": await auth_service.count_todays_calls(current_user.company_id),
+
+        # Statistiques des prospects
+        "total_prospects": await auth_service.count_total_prospects(current_user.company_id),
+
+        # Taux de réalisation
+        "completion_rate": await auth_service.calculate_completion_rate(current_user.company_id)
     }
+
     return stats
 
 
