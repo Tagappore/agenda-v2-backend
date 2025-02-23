@@ -85,6 +85,7 @@ class AuthService:
             # Pour les companies, le mot de passe est stocké directement
             if password != company["password"]:
                 print("Mot de passe incorrect pour company")
+                
                 return False
             
             if not company.get("is_active", True):
