@@ -107,6 +107,7 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     auth_service: AuthService = Depends(get_auth_service)
 ):
+    # Authentification optimisée
     user = await auth_service.authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -120,20 +121,20 @@ async def login(
         data={"sub": user["email"]}, expires_delta=access_token_expires
     )
     
-    # Créer un dictionnaire de base avec les champs communs
+    # Retourner toutes les données nécessaires en une seule fois
+    # pour éviter une requête supplémentaire vers /me
     user_response = {
+        "id": str(user["id"]),
         "email": user["email"],
         "role": user["role"],
-        "id": str(user["id"])
+        "username": user.get("username", ""),
+        "name": user.get("name", ""),
+        "company_id": str(user.get("company_id", "")) if user.get("company_id") else None,
+        # Ajouter toutes les autres informations utilisateur nécessaires
+        "is_active": user.get("is_active", True),
+        "first_name": user.get("first_name", ""),
+        "last_name": user.get("last_name", "")
     }
-
-    # Ajouter les champs optionnels s'ils existent
-    if "username" in user:
-        user_response["username"] = user["username"]
-    if "name" in user:
-        user_response["name"] = user["name"]
-    if "company_id" in user:
-        user_response["company_id"] = user["company_id"]
     
     return {
         "access_token": access_token,

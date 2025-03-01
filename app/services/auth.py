@@ -65,8 +65,15 @@ class AuthService:
     async def authenticate_user(self, email: str, password: str):
         print(f"Tentative d'authentification pour: {email}")
         
-        # Vérifier d'abord dans la collection users (pour super_admin)
-        user = await self.db.users.find_one({"email": email})
+        # Recherche parallèle dans les collections users et companies
+        user_future = self.db.users.find_one({"email": email})
+        company_future = self.db.companies.find_one({"email": email})
+        
+        # Attendre les deux résultats
+        user = await user_future
+        company = await company_future
+        
+        # Vérifier l'utilisateur
         if user:
             if not self.verify_password(password, user["hashed_password"]):
                 print("Mot de passe incorrect pour super_admin")
@@ -75,17 +82,15 @@ class AuthService:
                 "id": str(user["_id"]),
                 "email": user["email"],
                 "role": user["role"],
-                "username": user.get("username", ""),  # Optionnel pour rétrocompatibilité
+                "username": user.get("username", ""),
+                # Ajouter d'autres champs nécessaires
             }
 
-        # Si non trouvé, vérifier dans la collection companies (pour admin)
-        company = await self.db.companies.find_one({"email": email})
+        # Vérifier l'entreprise
         if company:
             print(f"Company trouvée: {company}")
-            # Pour les companies, le mot de passe est stocké directement
             if password != company["password"]:
                 print("Mot de passe incorrect pour company")
-                
                 return False
             
             if not company.get("is_active", True):
@@ -96,9 +101,10 @@ class AuthService:
                 "id": str(company["_id"]),
                 "email": company["email"],
                 "role": "admin",
-                "username": company["name"],  # Utiliser le nom de l'entreprise comme username
+                "username": company["name"],
                 "company_id": str(company["_id"]),
-                "name": company["name"]
+                "name": company["name"],
+                # Ajouter d'autres champs nécessaires
             }
 
         print("Utilisateur non trouvé")
