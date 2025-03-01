@@ -118,10 +118,10 @@ async def get_dashboard_stats(
     stats = {
         # Statistiques des utilisateurs
         "total_agents": await auth_service.count_users_by_role("agent"),
-        "total_technicians": await auth_service.count_users_by_role("technicians"),
+        "total_technicians": await auth_service.count_users_by_role("technician"),
         "total_call_centers": await auth_service.count_users_by_role("call_center"),
         "active_agents": await auth_service.count_active_users_by_role("agent"),
-        "active_technicians": await auth_service.count_active_users_by_role("technicians"),
+        "active_technicians": await auth_service.count_active_users_by_role("technician"),
         "active_call_centers": await auth_service.count_active_users_by_role("call_center"),
 
         # Statistiques des rendez-vous
