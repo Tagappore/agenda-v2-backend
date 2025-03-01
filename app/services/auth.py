@@ -163,10 +163,17 @@ class AuthService:
             "company_id": company_id,
             "date": {"$gte": today, "$lt": tomorrow}
         })
+    
 
     async def count_total_prospects(self, company_id: str) -> int:
         """Compte le nombre total de prospects pour une entreprise"""
         return await self.db.prospects.count_documents({
+            "company_id": company_id
+        })
+    
+    async def count_total_technicians(self, company_id: str) -> int:
+        """Compte le nombre total de prospects pour une entreprise"""
+        return await self.db.users.count_documents({
             "company_id": company_id
         })
 
