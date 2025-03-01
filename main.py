@@ -13,6 +13,7 @@ from app.routes import technician
 from app.routes import call_center
 from app.routes import prospect
 from app.routes import appointments
+from app.routes import health
 
 # Gestionnaire des connexions WebSocket
 class ConnectionManager:
@@ -137,6 +138,7 @@ app.include_router(technician.router, prefix="/api", tags=["technicians"])
 app.include_router(call_center.router, prefix="/api", tags=["call_centers"])
 app.include_router(prospect.router, prefix="/api", tags=["prospects"])
 app.include_router(appointments.router, prefix="/api", tags=["appointments"])
+app.include_router(health.router, prefix="/api",tags=["health"])
 
 # Configuration des fichiers statiques
 STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "static")
