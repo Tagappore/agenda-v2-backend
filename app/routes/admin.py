@@ -13,10 +13,10 @@ async def create_user(
     current_user: User = Depends(verify_admin),
     auth_service: AuthService = Depends(get_auth_service)
 ):
-    if user_data.role not in ["agent", "work"]:
+    if user_data.role not in ["agent", "technician"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Admin can only create agent or work users"
+            detail="Admin can only create agent or technician users"
         )
     try:
         return await auth_service.create_user(user_data)
@@ -30,9 +30,9 @@ async def create_user(
 async def get_users(
     current_user: User = Depends(verify_admin),
     auth_service: AuthService = Depends(get_auth_service)):
-    # Get both agent and work users
+    # Get both agent and technician users
     agents = await auth_service.get_users_by_role("agent")
-    workers = await auth_service.get_users_by_role("work")
+    workers = await auth_service.get_users_by_role("technician")
     return agents + workers
 
 @router.get("/users/{user_id}", response_model=User)
@@ -42,7 +42,7 @@ async def get_user(
     auth_service: AuthService = Depends(get_auth_service)
 ):
     user = await auth_service.get_user_by_id(user_id)
-    if not user or user.role not in ["agent", "work"]:
+    if not user or user.role not in ["agent", "technician"]:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
@@ -57,16 +57,16 @@ async def update_user(
     auth_service: AuthService = Depends(get_auth_service)
 ):
     user = await auth_service.get_user_by_id(user_id)
-    if not user or user.role not in ["agent", "work"]:
+    if not user or user.role not in ["agent", "technician"]:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
     
-    if user_update.role and user_update.role not in ["agent", "work"]:
+    if user_update.role and user_update.role not in ["agent", "technician"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Admin can only manage agent or work users"
+            detail="Admin can only manage agent or technician users"
         )
     
     return await auth_service.update_user(user_id, user_update)
@@ -78,7 +78,7 @@ async def delete_user(
     auth_service: AuthService = Depends(get_auth_service)
 ):
     user = await auth_service.get_user_by_id(user_id)
-    if not user or user.role not in ["agent", "work"]:
+    if not user or user.role not in ["agent", "technician"]:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
@@ -95,7 +95,7 @@ async def toggle_user_status(
     auth_service: AuthService = Depends(get_auth_service)
 ):
     user = await auth_service.get_user_by_id(user_id)
-    if not user or user.role not in ["agent", "work"]:
+    if not user or user.role not in ["agent", "technician"]:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
