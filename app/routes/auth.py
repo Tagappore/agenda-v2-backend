@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+# Correction pour auth.py - Supprimer la fonction get_current_user doublée
+# et ajouter une gestion optimisée des délais
+
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from fastapi import Form
@@ -10,9 +13,7 @@ from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
-
-
-
+import asyncio
 
 router = APIRouter(tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -30,7 +31,7 @@ async def get_db():
 async def get_auth_service(db: AsyncIOMotorClient = Depends(get_db)):
     return AuthService(db)
 
-# Helper function to get the current user
+# Helper function to get the current user - VERSION UNIFIÉE
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     auth_service: AuthService = Depends(get_auth_service)
@@ -53,7 +54,28 @@ async def get_current_user(
         
     user = await auth_service.get_user_by_email(email)
     if user is None:
-        raise credentials_exception
+        # Vérifier si c'est une entreprise
+        company = await auth_service.get_company_by_email(email)
+        if company is None:
+            raise credentials_exception
+        # S'assurer que tous les champs nécessaires sont présents
+        user = {
+            "id": str(company["_id"]),
+            "email": company["email"],
+            "role": "admin",
+            "name": company["name"],
+            "company_id": str(company["_id"]),
+            "username": company["email"],
+            "_id": company["_id"]  # Ajout pour assurer la compatibilité
+        }
+    
+    # Vérifier si l'utilisateur ou l'entreprise est actif
+    if not user.get("is_active", True):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Compte utilisateur désactivé",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
         
     return user
 
@@ -102,8 +124,17 @@ async def reset_password(
             detail=str(e)
         )
 
+# Tâche d'arrière-plan pour enregistrer les connexions
+async def record_login(auth_service, user_id):
+    try:
+        await asyncio.sleep(1)  # Ne pas bloquer la réponse
+        await auth_service.record_user_login(user_id)
+    except Exception as e:
+        print(f"Erreur lors de l'enregistrement de la connexion: {e}")
+
 @router.post("/token")
 async def login(
+    background_tasks: BackgroundTasks,
     form_data: OAuth2PasswordRequestForm = Depends(),
     auth_service: AuthService = Depends(get_auth_service)
 ):
@@ -116,21 +147,30 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Vérifier si l'utilisateur est actif
+    if not user.get("is_active", True):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Compte utilisateur désactivé",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
     access_token = auth_service.create_access_token(
         data={"sub": user["email"]}, expires_delta=access_token_expires
     )
     
+    # Enregistrer la connexion en arrière-plan
+    background_tasks.add_task(record_login, auth_service, str(user["_id"]))
+    
     # Retourner toutes les données nécessaires en une seule fois
-    # pour éviter une requête supplémentaire vers /me
     user_response = {
-        "id": str(user["id"]),
+        "id": str(user["_id"]),
         "email": user["email"],
         "role": user["role"],
         "username": user.get("username", ""),
         "name": user.get("name", ""),
         "company_id": str(user.get("company_id", "")) if user.get("company_id") else None,
-        # Ajouter toutes les autres informations utilisateur nécessaires
         "is_active": user.get("is_active", True),
         "first_name": user.get("first_name", ""),
         "last_name": user.get("last_name", "")
@@ -141,44 +181,6 @@ async def login(
         "token_type": "bearer",
         "user": user_response
     }
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    auth_service: AuthService = Depends(get_auth_service)
-):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    try:
-        payload = jwt.decode(
-            token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
-        )
-        email: str = payload.get("sub")
-        if email is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-        
-    user = await auth_service.get_user_by_email(email)
-    if user is None:
-        company = await auth_service.get_company_by_email(email)
-        if company is None:
-            raise credentials_exception
-        # S'assurer que tous les champs nécessaires sont présents
-        user = {
-            "id": str(company["_id"]),
-            "email": company["email"],
-            "role": "admin",
-            "name": company["name"],
-            "company_id": str(company["_id"]),  # Ajout du company_id
-            "username": company["email"]  # Utiliser l'email comme username par défaut
-        }
-        
-    return user
-
 
 @router.post("/create-super-admin", response_model=User)
 async def create_super_admin(
