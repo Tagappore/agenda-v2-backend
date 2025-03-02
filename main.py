@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-import os
 import asyncio
 from fastapi.staticfiles import StaticFiles
 from app.routes import auth, super_admin, admin, agent, work, companies
@@ -14,6 +13,13 @@ from app.routes import call_center
 from app.routes import prospect
 from app.routes import appointments
 from app.routes import health
+
+# Au début du fichier, avant d'importer quoi que ce soit d'autre
+import os
+import sys
+print(f"Démarrage de l'application avec Python {sys.version}")
+print(f"Répertoire courant: {os.getcwd()}")
+print(f"Variables d'environnement: {list(os.environ.keys())}")
 
 # Gestionnaire des connexions WebSocket
 class ConnectionManager:
