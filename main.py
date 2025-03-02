@@ -102,8 +102,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://app.tag-appore.com", 
-         "http://back.app.tag-appore.com/", # Sans le slash final
-        "https://agenda-v2-backend.onrender.com",  # Sans le slash final
+        "http://back.app.tag-appore.com", # Sans le slash final
+        "https://back.app.tag-appore.com", # Version HTTPS
+        "https://agenda-v2-backend.onrender.com",
         "http://localhost:3000"  # Pour le développement local
     ],
     allow_credentials=True,
