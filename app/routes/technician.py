@@ -340,6 +340,67 @@ async def toggle_technician_status(
     except Exception as e:
         print(f"Erreur lors de la modification du statut: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+    
+# Ajoutez cette fonction à la fin de votre fichier routes/technician.py
+
+@router.get("/technicians/{technician_id}/appointments", response_model=List[Dict[str, Any]])
+async def get_technician_appointments(
+    technician_id: str,
+    current_user: dict = Depends(verify_admin),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    try:
+        # Vérifier si le technicien existe et appartient à la même entreprise
+        technician = await db.users.find_one({
+            "_id": ObjectId(technician_id),
+            "company_id": current_user["company_id"],
+            "role": "technician"
+        })
+        
+        if not technician:
+            raise HTTPException(status_code=404, detail="Technicien non trouvé")
+        
+        # Récupérer tous les rendez-vous pour ce technicien
+        appointments = await db.appointments.find({
+            "technician_id": technician_id,
+            "company_id": current_user["company_id"]
+        }).sort("dateTime", -1).to_list(1000)
+        
+        # Formatage de la réponse
+        formatted_appointments = []
+        for appointment in appointments:
+            # Récupérer les informations du prospect si disponible
+            prospect_info = {}
+            if "prospect_id" in appointment and appointment["prospect_id"]:
+                prospect = await db.prospects.find_one({"_id": ObjectId(appointment["prospect_id"])})
+                if prospect:
+                    prospect_info = {
+                        "client_name": f"{prospect.get('first_name', '')} {prospect.get('last_name', '')}".strip(),
+                        "client_email": prospect.get("email", ""),
+                        "client_phone": prospect.get("phone", "")
+                    }
+            
+            # Créer l'objet rendez-vous formaté
+            formatted_appointment = {
+                "id": str(appointment.get("_id", "")),
+                "date": appointment.get("dateTime"),
+                "status": appointment.get("status", "created"),
+                "address": f"{appointment.get('address', '')}, {appointment.get('postal_code', '')} {appointment.get('city', '')}",
+                "notes": appointment.get("comment", ""),
+                "client_name": prospect_info.get("client_name", appointment.get("name", "")),
+                "client_email": prospect_info.get("client_email", ""),
+                "client_phone": prospect_info.get("client_phone", appointment.get("phone", "")),
+                "created_at": appointment.get("created_at", ""),
+                "updated_at": appointment.get("updated_at", "")
+            }
+            
+            formatted_appointments.append(formatted_appointment)
+        
+        return formatted_appointments
+        
+    except Exception as e:
+        print(f"Erreur lors de la récupération des rendez-vous du technicien: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))    
 
 @router.post("/technicians/{technician_id}/reset-password", response_model=Dict[str, Any])
 async def reset_technician_password(
