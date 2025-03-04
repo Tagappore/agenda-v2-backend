@@ -350,6 +350,9 @@ async def get_technician_appointments(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     try:
+        # Ajouter des logs pour le débogage
+        print(f"Tentative de récupération des rendez-vous pour le technicien ID: {technician_id}")
+        
         # Vérifier si le technicien existe et appartient à la même entreprise
         technician = await db.users.find_one({
             "_id": ObjectId(technician_id),
@@ -358,13 +361,20 @@ async def get_technician_appointments(
         })
         
         if not technician:
+            print(f"Technicien non trouvé: {technician_id}")
             raise HTTPException(status_code=404, detail="Technicien non trouvé")
         
         # Récupérer tous les rendez-vous pour ce technicien
-        appointments = await db.appointments.find({
+        query = {
             "technician_id": technician_id,
             "company_id": current_user["company_id"]
-        }).sort("dateTime", -1).to_list(1000)
+        }
+        print(f"Requête MongoDB: {query}")
+        
+        appointments = await db.appointments.find(query).sort("dateTime", -1).to_list(1000)
+        print(f"Nombre de rendez-vous trouvés: {len(appointments)}")
+        if appointments and len(appointments) > 0:
+            print(f"Structure du premier rendez-vous: {appointments[0]}")
         
         # Formatage de la réponse
         formatted_appointments = []
@@ -383,7 +393,7 @@ async def get_technician_appointments(
             # Créer l'objet rendez-vous formaté
             formatted_appointment = {
                 "id": str(appointment.get("_id", "")),
-                "date": appointment.get("dateTime"),
+                "date": appointment.get("dateTime"),  # Assurez-vous que ce champ est renvoyé comme "date"
                 "status": appointment.get("status", "created"),
                 "address": f"{appointment.get('address', '')}, {appointment.get('postal_code', '')} {appointment.get('city', '')}",
                 "notes": appointment.get("comment", ""),
@@ -400,7 +410,7 @@ async def get_technician_appointments(
         
     except Exception as e:
         print(f"Erreur lors de la récupération des rendez-vous du technicien: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))    
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/technicians/{technician_id}/reset-password", response_model=Dict[str, Any])
 async def reset_technician_password(
