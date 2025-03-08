@@ -351,8 +351,8 @@ async def get_dashboard_stats(
 ):
    try:
        stats = {
-           "total_workers": await auth_service.count_users_by_role("work"),
-           "active_workers": await auth_service.count_active_users_by_role("work"),
+           "total_technician": await auth_service.count_users_by_role("technician"),
+           "active_technician": await auth_service.count_active_users_by_role("technician"),
            "total_agents": await auth_service.count_users_by_role("agent"),
            "active_agents": await auth_service.count_active_users_by_role("agent")
        }

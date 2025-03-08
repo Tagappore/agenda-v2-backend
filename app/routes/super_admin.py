@@ -53,7 +53,7 @@ async def get_users(
 ):
     try:
         users = await db.users.find({
-            "role": {"$in": ["agent", "work"]},
+            "role": {"$in": ["agent", "technician"]},
             "company_id": current_user["company_id"]
         }).to_list(1000)
         
@@ -73,7 +73,7 @@ async def get_user(
         user = await db.users.find_one({
             "_id": ObjectId(user_id),
             "company_id": current_user["company_id"],
-            "role": {"$in": ["agent", "work"]}
+            "role": {"$in": ["agent", "technician"]}
         })
         
         if not user:
@@ -98,7 +98,7 @@ async def update_user(
         existing_user = await db.users.find_one({
             "_id": user_oid,
             "company_id": current_user["company_id"],
-            "role": {"$in": ["agent", "work"]}
+            "role": {"$in": ["agent", "technician"]}
         })
         
         if not existing_user:
@@ -148,7 +148,7 @@ async def delete_user(
         user = await db.users.find_one({
             "_id": user_oid,
             "company_id": current_user["company_id"],
-            "role": {"$in": ["agent", "work"]}
+            "role": {"$in": ["agent", "technician"]}
         })
         
         if not user:
@@ -187,7 +187,7 @@ async def toggle_user_status(
         user = await db.users.find_one({
             "_id": user_oid,
             "company_id": current_user["company_id"],
-            "role": {"$in": ["agent", "work"]}
+            "role": {"$in": ["agent", "technician"]}
         })
         
         if not user:
@@ -228,10 +228,10 @@ async def get_dashboard_stats(
         # Statistiques globales qui ne nécessitent pas de company_id
         stats = {
             "total_agents": await auth_service.count_users_by_role("agent"),
-            "total_technicians": await auth_service.count_users_by_role("work"),
+            "total_technicians": await auth_service.count_users_by_role("technician"),
             "total_call_centers": await auth_service.count_users_by_role("call_center"),
             "active_agents": await auth_service.count_active_users_by_role("agent"),
-            "active_technicians": await auth_service.count_active_users_by_role("work"),
+            "active_technicians": await auth_service.count_active_users_by_role("technician"),
             "active_call_centers": await auth_service.count_active_users_by_role("call_center"),
         }
 
