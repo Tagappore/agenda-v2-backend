@@ -116,20 +116,15 @@ class AuthService:
         if company_id:
             query["company_id"] = company_id
         return await self.db.users.count_documents(query)
-    
-
-    async def count_active_users(self) -> int:
-        return await self.db.users.count_documents({"is_active": True})
 
     async def count_companies(self) -> int:
         return await self.db.companies.count_documents({})
     
-    async def count_active_users_by_role(self, role: str) -> int:
-        """Compte le nombre d'utilisateurs actifs par rôle"""
-        return await self.db.users.count_documents({
-            "role": role,
-            "is_active": True
-        })
+    async def count_active_users_by_role(self, role: str, company_id: str = None) -> int:
+        query = {"role": role, "is_active": True}
+        if company_id:
+            query["company_id"] = company_id
+        return await self.db.users.count_documents(query)
 
     async def count_total_appointments(self, company_id: str) -> int:
         """Compte le nombre total de rendez-vous pour une entreprise"""
