@@ -171,16 +171,9 @@ class AuthService:
             "company_id": company_id
         })
     
-    async def count_total_technicians(self, company_id: str) -> int:
-        """Compte le nombre total de techniciens pour une entreprise"""
-        try:
-            return await self.db.users.count_documents({
-                "company_id": ObjectId(company_id),
-                "role": "technician"
-            })
-        except Exception as e:
-            print(f"Erreur lors du comptage des techniciens: {str(e)}")
-            return 0
+    async def count_total_technicians(self, company_id: str):
+        count = await self.db.users.count_documents({"role": "technician", "company_id": company_id})
+        return count
 
     async def calculate_completion_rate(self, company_id: str) -> float:
         """Calcule le taux de réalisation des rendez-vous pour une entreprise"""
