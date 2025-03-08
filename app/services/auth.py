@@ -111,11 +111,8 @@ class AuthService:
         return False
 
 
-    async def count_users_by_role(self, role: str, company_id: str = None) -> int:
-        query = {"role": role}
-        if company_id:
-            query["company_id"] = company_id
-        return await self.db.users.count_documents(query)
+    async def count_users_by_role(self, role: str) -> int:
+        return await self.db.users.count_documents({"role": role})
     
 
     async def count_active_users(self) -> int:
