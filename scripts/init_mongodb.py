@@ -59,7 +59,7 @@ async def init_mongodb():
     │   │   ├── email: string (unique)
     │   │   ├── username: string (unique)
     │   │   ├── hashed_password: string
-    │   │   ├── role: string (enum: super_admin, admin, agent, work)
+    │   │   ├── role: string (enum: super_admin, admin, agent, technician)
     │   │   ├── is_active: boolean
     │   │   ├── created_at: datetime
     │   │   └── updated_at: datetime
@@ -109,7 +109,7 @@ async def create_validations(db):
                             "minLength": 3
                         },
                         "role": {
-                            "enum": ["super_admin", "admin", "agent", "work"]
+                            "enum": ["super_admin", "admin", "agent", "technician"]
                         },
                         "is_active": {
                             "bsonType": "bool"

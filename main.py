@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import asyncio
 from fastapi.staticfiles import StaticFiles
-from app.routes import auth, super_admin, admin, agent, work, companies
+from app.routes import auth, super_admin, admin, agent,technician, companies,call_center,prospect
 from app.config import settings
 from app.routes.email import router as email_router
 from typing import Dict
@@ -141,7 +141,6 @@ app.include_router(companies.router, prefix="/api/companies", tags=["companies"]
 app.include_router(super_admin.router, prefix="/api", tags=["super-admin"])
 app.include_router(admin.router, prefix="/api", tags=["admin"])
 app.include_router(agent.router, prefix="/api", tags=["agent"])
-app.include_router(work.router, prefix="/api", tags=["work"])
 app.include_router(technician.router, prefix="/api", tags=["technicians"])
 app.include_router(call_center.router, prefix="/api", tags=["call_centers"])
 app.include_router(prospect.router, prefix="/api", tags=["prospects"])
