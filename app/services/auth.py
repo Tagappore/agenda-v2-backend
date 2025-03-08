@@ -175,7 +175,7 @@ class AuthService:
     async def count_total_technicians(self, company_id: str) -> int:
         return await self.db.users.count_documents({
             "company_id": company_id,
-            "role": "technician"  # Ajout du filtre sur le rôle
+            "role": "technician"
         })
         
 
