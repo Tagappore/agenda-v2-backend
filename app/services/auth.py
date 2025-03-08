@@ -113,6 +113,7 @@ class AuthService:
 
     async def count_users_by_role(self, role: str) -> int:
         return await self.db.users.count_documents({"role": role})
+    
 
     async def count_active_users(self) -> int:
         return await self.db.users.count_documents({"is_active": True})
@@ -171,9 +172,11 @@ class AuthService:
             "company_id": company_id
         })
     
-    async def count_total_technicians(self, company_id: str):
-        count = await self.db.users.count_documents({"role": "technician", "company_id": company_id})
-        return count
+    async def count_total_technicians(self, company_id: str) -> int:
+        return await self.db.users.count_documents({
+            "role": "technician", "company_id": company_id})
+        
+
 
     async def calculate_completion_rate(self, company_id: str) -> float:
         """Calcule le taux de réalisation des rendez-vous pour une entreprise"""
