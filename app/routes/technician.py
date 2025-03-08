@@ -412,19 +412,7 @@ async def get_technician_appointments(
         print(f"Erreur lors de la récupération des rendez-vous du technicien: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.get("/technicians/count", response_model=int)
-async def get_technicians_count(
-    current_user: dict = Depends(verify_admin),
-    db: AsyncIOMotorDatabase = Depends(get_database)
-):
-    try:
-        count = await db.users.count_documents(
-            {"role": "technician", "company_id": current_user["company_id"]}
-        )
-        return count
-    except Exception as e:
-        print(f"Erreur lors de la récupération du nombre de techniciens: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))    
+    
 
 @router.post("/technicians/{technician_id}/reset-password", response_model=Dict[str, Any])
 async def reset_technician_password(
