@@ -10,9 +10,11 @@ from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
+import logging
 
-
-
+# Configuration du logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -237,18 +239,54 @@ async def refresh_access_token(token: str = Depends(oauth2_scheme), db = Depends
     auth_service = AuthService(db)
     
     try:
+        logger.info("Démarrage du rafraîchissement de token")
+        
         # Vérifier que le token actuel est valide
-        payload = await auth_service.verify_token(token)
+        try:
+            # Décoder manuellement le token pour éviter les erreurs dans verify_token
+            payload = jwt.decode(
+                token, 
+                settings.jwt_secret,
+                algorithms=[settings.jwt_algorithm]
+            )
+            logger.info(f"Token décodé manuellement avec succès, payload: {payload}")
+            
+            # Vérifier si l'entreprise a révoqué ses tokens (si applicable)
+            company_id = payload.get("company_id")
+            if company_id:
+                try:
+                    from bson import ObjectId
+                    company_oid = ObjectId(company_id)
+                    company = await db.companies.find_one({"_id": company_oid})
+                    
+                    if company and company.get("token_invalidation_timestamp"):
+                        token_iat = datetime.fromtimestamp(payload.get("iat", 0))
+                        if token_iat < company["token_invalidation_timestamp"]:
+                            raise HTTPException(
+                                status_code=401,
+                                detail="Token révoqué"
+                            )
+                except Exception as e:
+                    logger.error(f"Erreur lors de la vérification de la révocation: {e}")
+                    # Ne pas échouer complètement, continuer
+            
+        except Exception as e:
+            logger.error(f"Erreur lors du décodage manuel du token: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=401, detail="Token invalide")
         
         # Si on arrive ici, le token est valide. Créer un nouveau token
         # avec les mêmes informations mais une nouvelle date d'expiration
         new_token_data = {
-            "sub": payload["sub"],
-            "email": payload["email"],
-            "role": payload["role"],
+            "sub": payload.get("sub", ""),
+            "email": payload.get("email", payload.get("sub", "")),
+            "role": payload.get("role", ""),
             "company_id": payload.get("company_id"),
-            "iat": datetime.utcnow()  # Nouvelle date d'émission
+            "iat": datetime.utcnow().timestamp()  # Nouvelle date d'émission
         }
+        
+        logger.info(f"Nouvelles données de token: {new_token_data}")
         
         # Créer un nouveau token avec une expiration de 24h
         access_token = auth_service.create_access_token(
@@ -256,12 +294,19 @@ async def refresh_access_token(token: str = Depends(oauth2_scheme), db = Depends
             expires_delta=timedelta(hours=24)
         )
         
+        logger.info(f"Nouveau token créé avec succès")
+        
         return {"access_token": access_token, "token_type": "bearer"}
         
-    except JWTError:
+    except JWTError as je:
+        logger.error(f"Erreur JWT: {je}")
         raise HTTPException(status_code=401, detail="Token invalide ou expiré")
-    except HTTPException:
+    except HTTPException as he:
+        logger.error(f"HTTPException interceptée: {he}")
         # Re-raise any HTTP exceptions from verify_token
         raise
     except Exception as e:
+        logger.error(f"Erreur inattendue: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erreur de rafraîchissement du token: {str(e)}")

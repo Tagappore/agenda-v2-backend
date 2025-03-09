@@ -205,6 +205,10 @@ class AuthService:
         return None
 
     async def verify_token(self, token: str) -> dict:  # Ajout du self
+        """
+        Vérifie la validité d'un token JWT et retourne son payload.
+        Vérifie également si le token n'a pas été révoqué.
+        """
         try:
             # Décodage du token
             payload = jwt.decode(
@@ -213,25 +217,55 @@ class AuthService:
                 algorithms=[settings.jwt_algorithm]  # Utilisation de settings au lieu de ALGORITHM
             )
             
-            # Vérifier si l'entreprise a révoqué ses tokens
-            company = await self.db.companies.find_one(  # Utilisation de self.db
-                {"_id": ObjectId(payload.get("company_id"))}
-            )
+            # Vérification de base
+            if not payload or "sub" not in payload:
+                print(f"Token invalide, payload incomplet: {payload}")
+                raise HTTPException(
+                    status_code=401,
+                    detail="Token invalide"
+                )
             
-            if company and company.get("token_invalidation_timestamp"):
-                token_iat = datetime.fromtimestamp(payload["iat"])
-                if token_iat < company["token_invalidation_timestamp"]:
-                    raise HTTPException(
-                        status_code=401,
-                        detail="Token révoqué"
+            # Vérifier si l'entreprise a révoqué ses tokens
+            company_id = payload.get("company_id")
+            if company_id:
+                try:
+                    # Convertir en ObjectId uniquement si ce n'est pas None
+                    company_oid = ObjectId(company_id)
+                    
+                    company = await self.db.companies.find_one(  # Utilisation de self.db
+                        {"_id": company_oid}
                     )
+                    
+                    if company and company.get("token_invalidation_timestamp"):
+                        token_iat = datetime.fromtimestamp(payload.get("iat", 0))
+                        if token_iat < company["token_invalidation_timestamp"]:
+                            print(f"Token révoqué pour company_id: {company_id}")
+                            raise HTTPException(
+                                status_code=401,
+                                detail="Token révoqué"
+                            )
+                except (TypeError, ValueError) as e:
+                    print(f"Erreur lors de la conversion du company_id: {e}")
+                    # Ne pas échouer si company_id est invalide, juste logger
             
             return payload
-            
-        except JWTError:
+                
+        except JWTError as e:
+            print(f"JWTError lors de la vérification du token: {e}")
             raise HTTPException(
                 status_code=401,
                 detail="Token invalide"
+            )
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
+        except Exception as e:
+            print(f"Erreur inattendue lors de la vérification du token: {e}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erreur de vérification du token: {str(e)}"
             )
 
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None):
