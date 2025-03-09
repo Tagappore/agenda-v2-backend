@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from typing import List, Optional
 from datetime import datetime, timedelta
 import secrets
-
+from bson import ObjectId
 from ..models.share_link import ShareLinkCreate, ShareLinkResponse, ShareLinkDB, ShareLinkRevoke
 from ..config.database import get_database
 from ..services.auth import get_current_user, get_current_active_user
@@ -74,7 +74,7 @@ async def get_share_links(
     
     query = {}
     if technician_id:
-        query["technician_id"] = technician_id
+        query["technician_id"] = ObjectId(technician_id)
     if active_only:
         query["is_active"] = True
         query["expires_at"] = {"$gt": datetime.utcnow()}
