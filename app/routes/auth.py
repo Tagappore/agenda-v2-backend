@@ -6,7 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from ..services.auth import AuthService
 from ..models.user import UserCreate, User
 from ..config import settings
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
@@ -226,3 +226,42 @@ async def verify_agent(
             detail="Only agents can access this resource"
         )
     return current_user
+
+
+@router.post("/refresh-token")
+async def refresh_access_token(token: str = Depends(oauth2_scheme), db = Depends(get_db)):
+    """
+    Rafraîchit un token d'accès JWT si celui-ci est encore valide.
+    Retourne un nouveau token avec une période de validité prolongée.
+    """
+    auth_service = AuthService(db)
+    
+    try:
+        # Vérifier que le token actuel est valide
+        payload = await auth_service.verify_token(token)
+        
+        # Si on arrive ici, le token est valide. Créer un nouveau token
+        # avec les mêmes informations mais une nouvelle date d'expiration
+        new_token_data = {
+            "sub": payload["sub"],
+            "email": payload["email"],
+            "role": payload["role"],
+            "company_id": payload.get("company_id"),
+            "iat": datetime.utcnow()  # Nouvelle date d'émission
+        }
+        
+        # Créer un nouveau token avec une expiration de 24h
+        access_token = auth_service.create_access_token(
+            data=new_token_data,
+            expires_delta=timedelta(hours=24)
+        )
+        
+        return {"access_token": access_token, "token_type": "bearer"}
+        
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token invalide ou expiré")
+    except HTTPException:
+        # Re-raise any HTTP exceptions from verify_token
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur de rafraîchissement du token: {str(e)}")
