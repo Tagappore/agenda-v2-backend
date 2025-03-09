@@ -74,7 +74,60 @@ async def get_share_links(
     
     query = {}
     if technician_id:
-        query["technician_id"] = ObjectId(technician_id)
+        try:
+            # Tentative de conversion en ObjectId
+            if ObjectId.is_valid(technician_id):
+                query["technician_id"] = ObjectId(technician_id)
+            else:
+                # Si l'ID n'est pas valide, on utilise une expression régulière pour faire une correspondance partielle
+                # Créer un pipeline d'agrégation pour les IDs partiels
+                pipeline = [
+                    {
+                        "$addFields": {
+                            "technician_id_str": { "$toString": "$technician_id" }
+                        }
+                    },
+                    {
+                        "$match": {
+                            "technician_id_str": { "$regex": f"^{technician_id}" }
+                        }
+                    }
+                ]
+                
+                if active_only:
+                    pipeline.append({
+                        "$match": {
+                            "is_active": True,
+                            "expires_at": { "$gt": datetime.utcnow() }
+                        }
+                    })
+                
+                # Utiliser une agrégation pour appliquer le pipeline
+                share_links = await db[collection_name].aggregate(pipeline).to_list(1000)
+                
+                # Traitement spécial pour les résultats d'agrégation
+                result = []
+                now = datetime.utcnow()
+                
+                for link in share_links:
+                    remaining_delta = link["expires_at"] - now
+                    remaining_time = format_remaining_time(remaining_delta)
+                    
+                    base_url = request.url_for("get_shared_calendar", token=link["token"])
+                    share_url = str(base_url)
+                    
+                    result.append({
+                        **link,
+                        "share_url": share_url,
+                        "remaining_time": remaining_time
+                    })
+                
+                return result
+        except Exception as e:
+            # En cas d'erreur, on log et on continue avec la requête normale
+            print(f"Erreur lors de la tentative de correspondance partielle des IDs: {str(e)}")
+    
+    # Code original si l'ID est valide ou si la correspondance partielle a échoué
     if active_only:
         query["is_active"] = True
         query["expires_at"] = {"$gt": datetime.utcnow()}
