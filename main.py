@@ -1,10 +1,9 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import asyncio
 from fastapi.staticfiles import StaticFiles
-from app.routes import auth, super_admin, admin, agent,technician, companies,call_center,prospect
+from app.routes import auth, super_admin, admin, agent, technician, companies, call_center, prospect
 from app.config import settings
 from app.routes.email import router as email_router
 from typing import Dict
@@ -13,6 +12,7 @@ from app.routes import call_center
 from app.routes import prospect
 from app.routes import appointments
 from app.routes import health
+from app.config.database import DatabaseConnection
 
 # Au début du fichier, avant d'importer quoi que ce soit d'autre
 import os
@@ -73,20 +73,32 @@ class ConnectionManager:
             del self.active_connections[client_id]
             print(f"Client {client_id} déconnecté")
 
+    # Ajout d'une méthode pour envoyer des messages de désactivation
+    async def send_deactivation_message(self, company_id: str):
+        # Envoyer un message à tous les clients connectés de cette entreprise
+        for client_id, websocket in list(self.active_connections.items()):
+            try:
+                # Vous devrez avoir une façon de déterminer quels clients
+                # appartiennent à quelle entreprise
+                await websocket.send_json({
+                    "type": "company_deactivated",
+                    "company_id": company_id
+                })
+            except Exception as e:
+                print(f"Erreur lors de l'envoi du message de désactivation: {str(e)}")
+
 manager = ConnectionManager()
 
 # Gestionnaire de cycle de vie de l'application
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Connexion à la base de données
-    app.mongodb_client = AsyncIOMotorClient(settings.mongodb_url)
-    app.mongodb = app.mongodb_client[settings.database_name]
+    # Startup: Utiliser la connexion singleton à la base de données
+    app.mongodb = await DatabaseConnection.get_database()
     app.websocket_manager = manager
     
     yield  # L'application s'exécute ici
     
-    # Shutdown: Fermeture de la connexion à la base de données
-    app.mongodb_client.close()
+    # Pas besoin de fermer la connexion ici, elle est gérée par le singleton
 
 # Création de l'application avec le gestionnaire de cycle de vie
 app = FastAPI(
@@ -133,7 +145,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 print(f"Erreur WebSocket pour {client_id}: {str(e)}")
                 break
     finally:
-        manager.disconnect(client_id)
+        await manager.disconnect(client_id)
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
@@ -145,22 +157,14 @@ app.include_router(technician.router, prefix="/api", tags=["technicians"])
 app.include_router(call_center.router, prefix="/api", tags=["call_centers"])
 app.include_router(prospect.router, prefix="/api", tags=["prospects"])
 app.include_router(appointments.router, prefix="/api", tags=["appointments"])
-app.include_router(health.router, prefix="/api",tags=["health"])
+app.include_router(health.router, prefix="/api", tags=["health"])
 
 # Configuration des fichiers statiques
 STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "static")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-
-# Events de démarrage et d'arrêt
-@app.on_event("startup")
-async def startup():
-    app.mongodb_client = AsyncIOMotorClient(settings.mongodb_url)
-    app.mongodb = app.mongodb_client[settings.database_name]
-
-@app.on_event("shutdown")
-async def shutdown():
-    app.mongodb_client.close()
+# Les événements de démarrage et d'arrêt ont été supprimés car ils sont redondants
+# avec le gestionnaire de cycle de vie et créent des connexions inutiles
 
 # Route racine
 @app.get("/")

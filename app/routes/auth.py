@@ -2,34 +2,21 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from fastapi import Form
-from motor.motor_asyncio import AsyncIOMotorClient
 from ..services.auth import AuthService
 from ..models.user import UserCreate, User
 from ..config import settings
+from ..config.database import get_database
 from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
 
-
-
-
 router = APIRouter(tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Dependency to get the database instance
-async def get_db():
-    client = AsyncIOMotorClient(settings.mongodb_url)
-    db = client[settings.database_name]
-    try:
-        yield db
-    finally:
-        client.close()
-
 # Dependency to get the auth service
-async def get_auth_service(db: AsyncIOMotorClient = Depends(get_db)):
+async def get_auth_service(db = Depends(get_database)):
     return AuthService(db)
-
 
 @router.post("/auth/reset-password")
 async def reset_password(
@@ -90,21 +77,31 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    # Augmenter la durée de vie du token à 24 heures (1440 minutes)
+    access_token_expires = timedelta(minutes=1440)
+    
+    # Préparer les données pour le token JWT, inclure les infos utilisateur essentielles
+    token_data = {
+        "sub": user["email"],
+        "role": user["role"],
+        "user_id": str(user["_id"]) if "_id" in user else str(user["id"]),
+        "company_id": str(user["company_id"]) if "company_id" in user else None,
+        "name": user.get("name", ""),
+        "is_active": user.get("is_active", True)
+    }
+    
     access_token = auth_service.create_access_token(
-        data={"sub": user["email"]}, expires_delta=access_token_expires
+        data=token_data, expires_delta=access_token_expires
     )
     
     # Retourner toutes les données nécessaires en une seule fois
-    # pour éviter une requête supplémentaire vers /me
     user_response = {
-        "id": str(user["id"]),
+        "id": str(user["_id"]) if "_id" in user else str(user["id"]),
         "email": user["email"],
         "role": user["role"],
         "username": user.get("username", ""),
         "name": user.get("name", ""),
         "company_id": str(user.get("company_id", "")) if user.get("company_id") else None,
-        # Ajouter toutes les autres informations utilisateur nécessaires
         "is_active": user.get("is_active", True),
         "first_name": user.get("first_name", ""),
         "last_name": user.get("last_name", "")
@@ -116,10 +113,7 @@ async def login(
         "user": user_response
     }
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    auth_service: AuthService = Depends(get_auth_service)
-):
+async def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -133,26 +127,25 @@ async def get_current_user(
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-        
-    user = await auth_service.get_user_by_email(email)
-    if user is None:
-        company = await auth_service.get_company_by_email(email)
-        if company is None:
-            raise credentials_exception
-        # S'assurer que tous les champs nécessaires sont présents
+            
+        # Extraire les informations utilisateur directement du token
+        # sans requête à la base de données
+        current_time = datetime.now()
         user = {
-            "id": str(company["_id"]),
-            "email": company["email"],
-            "role": "admin",
-            "name": company["name"],
-            "company_id": str(company["_id"]),  # Ajout du company_id
-            "username": company["email"]  # Utiliser l'email comme username par défaut
+            "id": payload.get("user_id"),
+            "email": email,
+            "role": payload.get("role"),
+            "company_id": payload.get("company_id"),
+            "name": payload.get("name", ""),
+            "is_active": payload.get("is_active", True),
+            "created_at": current_time,
+            "updated_at": current_time
         }
         
-    return user
-
+        return user
+        
+    except JWTError:
+        raise credentials_exception
 
 @router.post("/create-super-admin", response_model=User)
 async def create_super_admin(
@@ -172,29 +165,30 @@ async def create_super_admin(
 async def read_users_me(
     current_user: dict = Depends(get_current_user)
 ):
-    # Convertir le document MongoDB en format compatible avec le modèle User
+    # Les données utilisateur sont déjà disponibles depuis le token JWT
+    # Pas besoin de requête additionnelle à la base de données
     current_time = datetime.now()
     user_dict = {
-        "id": str(current_user["_id"]) if "_id" in current_user else str(current_user["id"]),
+        "id": current_user["id"],
         "email": current_user["email"],
         "username": current_user.get("username", current_user["email"]),
         "role": current_user["role"],
         "is_active": current_user.get("is_active", True),
-        "first_name": current_user.get("first_name"),
-        "last_name": current_user.get("last_name"),
-        "phone": current_user.get("phone"),
-        "address": current_user.get("address"),
-        "city": current_user.get("city"),
-        "postal_code": current_user.get("postal_code"),
-        "photo": current_user.get("photo"),
-        "company_id": str(current_user["company_id"]) if "company_id" in current_user else None,
+        "first_name": current_user.get("first_name", ""),
+        "last_name": current_user.get("last_name", ""),
+        "phone": current_user.get("phone", ""),
+        "address": current_user.get("address", ""),
+        "city": current_user.get("city", ""),
+        "postal_code": current_user.get("postal_code", ""),
+        "photo": current_user.get("photo", ""),
+        "company_id": current_user["company_id"],
         "created_at": current_user.get("created_at", current_time),
         "updated_at": current_user.get("updated_at", current_time)
     }
     
     return user_dict
 
-# Dependency to verify super admin role
+# Dependency to verify super admin role - optimisée, sans requête BD
 async def verify_super_admin(
     current_user: dict = Depends(get_current_user)
 ):
@@ -205,7 +199,7 @@ async def verify_super_admin(
         )
     return current_user
 
-# Dependency to verify admin role
+# Dependency to verify admin role - optimisée, sans requête BD
 async def verify_admin(
     current_user: dict = Depends(get_current_user)
 ):
@@ -216,7 +210,7 @@ async def verify_admin(
         )
     return current_user
 
-# Dependency to verify agent role
+# Dependency to verify agent role - optimisée, sans requête BD
 async def verify_agent(
     current_user: dict = Depends(get_current_user)
 ):
