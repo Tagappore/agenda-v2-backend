@@ -37,6 +37,10 @@ class DatabaseConnection:
         await cls._db.appointments.create_index([("date", 1)])
         await cls._db.appointments.create_index([("status", 1)])
         # Ajoutez d'autres index selon vos besoins
+        await cls._db.absences.create_index([("technician_id", 1)])
+        await cls._db.absences.create_index([("start_date", 1)])
+        await cls._db.absences.create_index([("end_date", 1)])
+        await cls._db.absences.create_index([("company_id", 1)])
 
     @classmethod
     async def get_database(cls):
