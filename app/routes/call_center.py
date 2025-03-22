@@ -253,3 +253,61 @@ async def update_call_center(
         raise HTTPException(status_code=500, detail=str(e))
 
 # Les autres fonctions restent identiques
+@router.post("/call-centers/{call_center_id}/reset-password", response_model=Dict[str, Any])
+async def reset_call_center_password(
+    call_center_id: str,
+    current_user: dict = Depends(verify_admin),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    try:
+        call_center_oid = ObjectId(call_center_id)
+        
+        # Vérifier si le call center existe
+        call_center = await db.users.find_one({
+            "_id": call_center_oid,
+            "company_id": current_user["company_id"],
+            "role": "call_center"
+        })
+        
+        if not call_center:
+            raise HTTPException(status_code=404, detail="Call center non trouvé")
+
+        # Récupérer le nom de la société
+        company = await db.companies.find_one({"_id": ObjectId(current_user["company_id"])})
+        company_name = company.get("name", "Votre entreprise") if company else "Votre entreprise"
+
+        # Générer un nouveau mot de passe
+        new_password = generate_password()
+        hashed_password = pwd_context.hash(new_password)
+
+        # Mettre à jour le mot de passe
+        result = await db.users.update_one(
+            {"_id": call_center_oid, "company_id": current_user["company_id"]},
+            {"$set": {
+                "hashed_password": hashed_password,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=500, detail="Erreur lors de la réinitialisation du mot de passe")
+
+        # Envoyer le nouveau mot de passe par email
+        async with httpx.AsyncClient() as client:
+            email_data = {
+                "email": call_center["email"],
+                "companyName": company_name,
+                "password": new_password
+            }
+            email_response = await client.post(
+                "https://agenda-v2-backend.onrender.com/api/send-credentials",
+                data=email_data
+            )
+            if email_response.status_code != 200:
+                print(f"Erreur lors de l'envoi de l'email: {email_response.text}")
+
+        return {"password": new_password}
+
+    except Exception as e:
+        print(f"Erreur lors de la réinitialisation du mot de passe: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
