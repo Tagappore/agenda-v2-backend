@@ -160,6 +160,7 @@ app.include_router(prospect.router, prefix="/api", tags=["prospects"])
 app.include_router(appointments.router, prefix="/api", tags=["appointments"])
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(absences_router, prefix="/api", tags=["absences"])
+app.include_router(call_center.router, prefix="/api", tags=["call_centers"])
 
 # Configuration des fichiers statiques
 STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "static")
