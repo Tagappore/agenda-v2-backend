@@ -90,6 +90,59 @@ async def check_appointment_conflict(
         return True
     
     return False
+@router.get("/technicians/check-availability")
+async def check_technician_availability(
+    technician_id: str,
+    date_time: str,
+    exclude_appointment_id: str = None,
+    current_user: dict = Depends(verify_admin),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """
+    Vérifie si un technicien est disponible à une date et heure spécifique
+    """
+    try:
+        # Vérifier que le technicien existe
+        technician = await db.users.find_one({
+            "_id": ObjectId(technician_id),
+            "company_id": current_user["company_id"]
+        })
+        
+        if not technician:
+            raise HTTPException(status_code=404, detail="Technicien non trouvé")
+        
+        # Convertir la date et l'heure en objet datetime
+        try:
+            appointment_date = datetime.fromisoformat(date_time.replace('Z', '+00:00'))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Format de date invalide")
+        
+        # Vérifier s'il y a un conflit
+        has_conflict = await check_appointment_conflict(
+            db=db,
+            technician_id=technician_id,
+            appointment_date=appointment_date,
+            company_id=current_user["company_id"],
+            exclude_appointment_id=exclude_appointment_id
+        )
+        
+        if has_conflict:
+            raise HTTPException(
+                status_code=409,
+                detail="Conflit d'horaire: le technicien a déjà un rendez-vous à cette date et heure"
+            )
+        
+        # Si pas de conflit, renvoyer un message de disponibilité
+        return {
+            "available": True,
+            "message": "Le technicien est disponible à cette date et heure"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Erreur lors de la vérification de disponibilité: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/appointments", response_model=List[Dict[str, Any]])
 async def get_appointments(
