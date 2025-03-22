@@ -12,11 +12,11 @@ from datetime import datetime
 router = APIRouter(tags=["prospects"])
 
 class ProcessingStatus(str, Enum):
-    NEW = "new"
-    PROCESSING = "processing"
-    APPOINTMENT = "appointment"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
+    CREATED = "created"      # Nouveau
+    CONFIRMED = "confirmed"  # Placé
+    NEW_PLAN = "new_plan"    # Replanifier
+    COMPLETED = "completed"  # Terminé
+    CANCELLED = "cancelled"  # Annulé
 
 class HousingType(str, Enum):
     HOUSE = "house"
@@ -173,7 +173,7 @@ async def create_prospect(
             raise HTTPException(status_code=409, detail="Email déjà utilisé")
 
         # Valider et définir le statut de traitement par défaut
-        prospect_data["processing_status"] = "new"
+        prospect_data["processing_status"] = "created"  
         
         # Créer le prospect
         prospect_data["company_id"] = current_user["company_id"]
