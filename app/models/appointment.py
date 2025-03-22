@@ -4,10 +4,11 @@ from typing import Optional
 from enum import Enum
 
 class AppointmentStatus(str, Enum):
-    CREATED = "created"
-    CONFIRMED = "confirmed"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
+    CREATED = "created"      # Nouveau
+    CONFIRMED = "confirmed"  # Placé
+    NEW_PLAN = "new_plan"    # Replanifier
+    COMPLETED = "completed"  # Terminé
+    CANCELLED = "cancelled"  # Annulé
 
 class AppointmentBase(BaseModel):
     dateTime: datetime

@@ -189,22 +189,15 @@ async def update_prospect_status(
     appointment_status: str
 ):
     """
-    Met à jour le statut de traitement du prospect en fonction du statut du rendez-vous
+    Met à jour le statut de traitement du prospect avec le même statut que le rendez-vous
     """
-    # Mapping entre statut de rendez-vous et statut de prospect
-    status_mapping = {
-        "created": "appointment",
-        "confirmed": "appointment",
-        "completed": "completed",
-        "cancelled": "cancelled"
-    }
+    # Mettre à jour directement avec le même statut
+    await db.prospects.update_one(
+        {"_id": ObjectId(prospect_id)},
+        {"$set": {"processing_status": appointment_status, "updated_at": datetime.utcnow()}}
+    )
     
-    if appointment_status in status_mapping:
-        prospect_status = status_mapping[appointment_status]
-        await db.prospects.update_one(
-            {"_id": ObjectId(prospect_id)},
-            {"$set": {"processing_status": prospect_status, "updated_at": datetime.utcnow()}}
-        )
+    print(f"Statut du prospect {prospect_id} mis à jour: {appointment_status}")
 
 # Modifier la route PUT /appointments/{appointment_id}
 @router.put("/appointments/{appointment_id}", response_model=Dict[str, Any])
