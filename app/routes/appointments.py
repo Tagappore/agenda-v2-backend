@@ -30,6 +30,8 @@ def format_appointment_response(appointment: Dict[str, Any]) -> Dict[str, Any]:
         "updated_at": appointment.get("updated_at", datetime.utcnow())
     }
 
+# Modification de la fonction check_appointment_conflict pour mieux gérer les chevauchements
+
 async def check_appointment_conflict(
     db: AsyncIOMotorDatabase,
     technician_id: str,
@@ -47,9 +49,10 @@ async def check_appointment_conflict(
     if isinstance(appointment_date, str):
         appointment_date = datetime.fromisoformat(appointment_date.replace('Z', '+00:00'))
     
-    # Créer un intervalle de 1 heure autour du rendez-vous pour vérifier les conflits
-    start_time = appointment_date - timedelta(minutes=30)
-    end_time = appointment_date + timedelta(minutes=30)
+    # Créer un intervalle autour du rendez-vous pour vérifier les conflits
+    # Un rendez-vous typique dure environ 1 heure
+    start_time = appointment_date - timedelta(minutes=15)  # 15 minutes avant
+    end_time = appointment_date + timedelta(minutes=45)    # 45 minutes après
     
     # Construire la requête pour trouver les rendez-vous en conflit
     query = {
@@ -68,7 +71,25 @@ async def check_appointment_conflict(
     # Rechercher des rendez-vous existants qui pourraient être en conflit
     conflict = await db.appointments.find_one(query)
     
-    return conflict is not None
+    if conflict:
+        # Logguer le conflit pour faciliter le débogage
+        print(f"Conflit détecté: Technicien {technician_id} a déjà un RDV à {appointment_date}")
+        return True
+    
+    # Vérifier aussi les absences du technicien
+    absence_query = {
+        "technician_id": technician_id,
+        "start_date": {"$lte": end_time},
+        "end_date": {"$gte": start_time}
+    }
+    
+    absence_conflict = await db.absences.find_one(absence_query)
+    
+    if absence_conflict:
+        print(f"Conflit avec une absence: Technicien {technician_id} est indisponible à {appointment_date}")
+        return True
+    
+    return False
 
 @router.get("/appointments", response_model=List[Dict[str, Any]])
 async def get_appointments(
