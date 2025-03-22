@@ -295,45 +295,20 @@ async def reset_call_center_password(
         if result.modified_count == 0:
             raise HTTPException(status_code=500, detail="Erreur lors de la réinitialisation du mot de passe")
 
-        # Envoyer le nouveau mot de passe par email en utilisant le service d'email local
-        try:
-            # Configuration email
-            sender_email = "support@app.tag-appore.com"
-            smtp_password = "FyrJXhtT21A}"
-            
-            # Créer le message
-            msg = MIMEMultipart()
-            msg['From'] = sender_email
-            msg['To'] = call_center["email"]
-            msg['Subject'] = f"Vos nouveaux identifiants pour {company_name}"
-            
-            body = f"""
-            Bonjour {call_center['first_name']} {call_center['last_name']},
-            
-            Votre mot de passe pour accéder à la plateforme {company_name} a été réinitialisé.
-            
-            Voici vos identifiants de connexion :
-            Email : {call_center['email']}
-            Mot de passe : {new_password}
-            
-            Nous vous recommandons de changer ce mot de passe lors de votre prochaine connexion.
-            
-            Cordialement,
-            L'équipe {company_name}
-            """
-            
-            msg.attach(MIMEText(body, 'plain'))
-            
-            with smtplib.SMTP_SSL('app.tag-appore.com', 465) as server:
-                server.login(sender_email, smtp_password)
-                server.send_message(msg)
-                
-            print(f"Email de réinitialisation envoyé à {call_center['email']}")
-        except Exception as email_error:
-            print(f"Erreur lors de l'envoi de l'email: {str(email_error)}")
-            # On ne bloque pas la fonction si l'email échoue
-            # mais on continue et on renvoie juste le mot de passe
-        
+        # Envoyer le nouveau mot de passe par email
+        async with httpx.AsyncClient() as client:
+            email_data = {
+                "email": call_center["email"],
+                "companyName": company_name,
+                "password": new_password
+            }
+            email_response = await client.post(
+                "https://agenda-v2-backend.onrender.com/api/send-credentials",
+                data=email_data
+            )
+            if email_response.status_code != 200:
+                print(f"Erreur lors de l'envoi de l'email: {email_response.text}")
+
         return {"password": new_password}
 
     except Exception as e:
