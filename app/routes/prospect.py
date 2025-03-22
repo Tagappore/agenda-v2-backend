@@ -42,7 +42,7 @@ class ProspectBase(BaseModel):
     annual_income: int
     comments: Optional[str] = None
     call_center_name: Optional[str] = None
-    processing_status: ProcessingStatus = ProcessingStatus.NEW
+    processing_status: ProcessingStatus = ProcessingStatus.CREATED
 
 def format_prospect_response(prospect: Dict[str, Any]) -> Dict[str, Any]:
     """Formate la réponse du prospect de manière cohérente"""
