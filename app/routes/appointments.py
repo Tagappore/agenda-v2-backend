@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Dict, Any
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timedelta
 from ..models.appointment import AppointmentCreate, AppointmentUpdate, Appointment, AppointmentStatus
 from ..config.database import get_database
 from .auth import verify_admin
@@ -29,6 +29,46 @@ def format_appointment_response(appointment: Dict[str, Any]) -> Dict[str, Any]:
         "created_at": appointment.get("created_at", datetime.utcnow()),
         "updated_at": appointment.get("updated_at", datetime.utcnow())
     }
+
+async def check_appointment_conflict(
+    db: AsyncIOMotorDatabase,
+    technician_id: str,
+    appointment_date: datetime,
+    company_id: str,
+    exclude_appointment_id: str = None
+) -> bool:
+    """
+    Vérifie si un technicien a déjà un rendez-vous à la date et heure spécifiées
+    
+    Returns:
+        bool: True s'il y a un conflit, False sinon
+    """
+    # Convertir la date de rendez-vous en objet datetime si ce n'est pas déjà le cas
+    if isinstance(appointment_date, str):
+        appointment_date = datetime.fromisoformat(appointment_date.replace('Z', '+00:00'))
+    
+    # Créer un intervalle de 1 heure autour du rendez-vous pour vérifier les conflits
+    start_time = appointment_date - timedelta(minutes=30)
+    end_time = appointment_date + timedelta(minutes=30)
+    
+    # Construire la requête pour trouver les rendez-vous en conflit
+    query = {
+        "technician_id": technician_id,
+        "company_id": company_id,
+        "dateTime": {
+            "$gte": start_time,
+            "$lte": end_time
+        }
+    }
+    
+    # Si on met à jour un rendez-vous existant, l'exclure de la recherche
+    if exclude_appointment_id:
+        query["_id"] = {"$ne": ObjectId(exclude_appointment_id)}
+    
+    # Rechercher des rendez-vous existants qui pourraient être en conflit
+    conflict = await db.appointments.find_one(query)
+    
+    return conflict is not None
 
 @router.get("/appointments", response_model=List[Dict[str, Any]])
 async def get_appointments(
@@ -67,6 +107,20 @@ async def create_appointment(
         })
         if not technician:
             raise HTTPException(status_code=404, detail="Technicien non trouvé")
+            
+        # Vérifier s'il y a un conflit d'horaire
+        has_conflict = await check_appointment_conflict(
+            db=db,
+            technician_id=appointment_data["technician_id"],
+            appointment_date=appointment_data["dateTime"],
+            company_id=current_user["company_id"]
+        )
+        
+        if has_conflict:
+            raise HTTPException(
+                status_code=409,
+                detail="Conflit d'horaire: le technicien a déjà un rendez-vous à cette date et heure"
+            )
 
         # Ajouter les champs système
         appointment_data["company_id"] = current_user["company_id"]
@@ -79,6 +133,8 @@ async def create_appointment(
         
         return format_appointment_response(appointment_data)
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Erreur lors de la création du rendez-vous: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -129,6 +185,25 @@ async def update_appointment(
             })
             if not technician:
                 raise HTTPException(status_code=404, detail="Technicien non trouvé")
+        
+        # Vérifier s'il y a un conflit d'horaire
+        if "dateTime" in appointment_data or "technician_id" in appointment_data:
+            technician_id = appointment_data.get("technician_id", existing_appointment["technician_id"])
+            appointment_date = appointment_data.get("dateTime", existing_appointment["dateTime"])
+            
+            has_conflict = await check_appointment_conflict(
+                db=db,
+                technician_id=technician_id,
+                appointment_date=appointment_date,
+                company_id=current_user["company_id"],
+                exclude_appointment_id=appointment_id
+            )
+            
+            if has_conflict:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Conflit d'horaire: le technicien a déjà un rendez-vous à cette date et heure"
+                )
 
         # Mettre à jour le rendez-vous
         appointment_data["updated_at"] = datetime.utcnow()
@@ -145,6 +220,8 @@ async def update_appointment(
         updated_appointment = await db.appointments.find_one({"_id": ObjectId(appointment_id)})
         return format_appointment_response(updated_appointment)
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Erreur lors de la modification du rendez-vous: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
