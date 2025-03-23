@@ -135,21 +135,47 @@ async def create_prospect(prospect: ProspectBase, current_user: dict = Depends(g
     else:
         # Si le call center n'a pas de company_id dans son token,
         # essayer de le récupérer dans la base de données
-        user_in_db = await db["users"].find_one({"_id": ObjectId(current_user.get("id"))})
-        if user_in_db and user_in_db.get("company_id"):
-            prospect_data["company_id"] = user_in_db["company_id"]
-            print(f"Récupération du company_id depuis la BD: {prospect_data['company_id']}")
-        else:
-            print(f"ERREUR: Call center {current_user.get('id')} sans company_id!")
+        try:
+            user_in_db = await db["users"].find_one({"_id": ObjectId(current_user.get("id"))})
+            if user_in_db and user_in_db.get("company_id"):
+                prospect_data["company_id"] = user_in_db["company_id"]
+                print(f"Récupération du company_id depuis la BD: {prospect_data['company_id']}")
+            else:
+                print(f"ERREUR: Call center {current_user.get('id')} sans company_id!")
+        except Exception as e:
+            print(f"Erreur lors de la récupération du company_id: {str(e)}")
     
     # Ajouter le nom du call center
-    if "name" in current_user:
-        prospect_data["call_center_name"] = current_user["name"]
+    call_center_name = None
+    
+    # 1. Essayer d'obtenir le nom à partir de l'objet current_user
+    for field in ["name", "username", "first_name"]:
+        if field in current_user and current_user[field]:
+            call_center_name = current_user[field]
+            print(f"Nom du call center obtenu depuis current_user[{field}]: {call_center_name}")
+            break
+    
+    # 2. Si pas de nom trouvé, chercher dans la base de données
+    if not call_center_name:
+        try:
+            user_in_db = await db["users"].find_one({"_id": ObjectId(current_user.get("id"))})
+            if user_in_db:
+                # Essayer plusieurs champs possibles pour le nom
+                for field in ["name", "username", "first_name"]:
+                    if field in user_in_db and user_in_db[field]:
+                        call_center_name = user_in_db[field]
+                        print(f"Nom du call center obtenu depuis la BD [{field}]: {call_center_name}")
+                        break
+        except Exception as e:
+            print(f"Erreur lors de la récupération du nom du call center: {str(e)}")
+    
+    # Assigner le nom du call center s'il a été trouvé
+    if call_center_name:
+        prospect_data["call_center_name"] = call_center_name
     else:
-        # Essayer de récupérer le nom depuis la base de données
-        user_in_db = await db["users"].find_one({"_id": ObjectId(current_user.get("id"))})
-        if user_in_db and user_in_db.get("name"):
-            prospect_data["call_center_name"] = user_in_db["name"]
+        # Utiliser l'email comme fallback si aucun autre nom n'est disponible
+        prospect_data["call_center_name"] = current_user.get("email", "Call Center")
+        print(f"Fallback: Utilisation de l'email comme nom du call center: {prospect_data['call_center_name']}")
     
     # Ajouter les dates
     prospect_data["created_at"] = datetime.utcnow()
@@ -290,25 +316,28 @@ async def fix_prospects(current_user: dict = Depends(verify_admin_or_call_center
     db = current_user["request"].app.mongodb
     
     # Récupérer tous les prospects sans company_id
-    prospects = await db["prospects"].find({"company_id": None}).to_list(length=None)
+    prospects_without_company = await db["prospects"].find({"company_id": None}).to_list(length=None)
     
-    updated_count = 0
-    for prospect in prospects:
+    updated_company_count = 0
+    for prospect in prospects_without_company:
         if "call_center_id" in prospect:
-            # Récupérer le call center
-            call_center = await db["users"].find_one({"_id": ObjectId(prospect["call_center_id"])})
-            if call_center and call_center.get("company_id"):
-                # Mettre à jour le prospect avec le company_id du call center
-                await db["prospects"].update_one(
-                    {"_id": prospect["_id"]},
-                    {"$set": {
-                        "company_id": call_center["company_id"],
-                        "updated_at": datetime.utcnow()
-                    }}
-                )
-                updated_count += 1
+            try:
+                # Récupérer le call center
+                call_center = await db["users"].find_one({"_id": ObjectId(prospect["call_center_id"])})
+                if call_center and call_center.get("company_id"):
+                    # Mettre à jour le prospect avec le company_id du call center
+                    await db["prospects"].update_one(
+                        {"_id": prospect["_id"]},
+                        {"$set": {
+                            "company_id": call_center["company_id"],
+                            "updated_at": datetime.utcnow()
+                        }}
+                    )
+                    updated_company_count += 1
+            except Exception as e:
+                print(f"Erreur lors de la mise à jour du company_id: {str(e)}")
     
-    # Maintenant, corriger les prospects sans call_center_name
+    # Maintenant, corriger les prospects sans call_center_name ou avec call_center_name vide
     prospects_without_name = await db["prospects"].find({
         "call_center_id": {"$exists": True},
         "$or": [
@@ -317,19 +346,30 @@ async def fix_prospects(current_user: dict = Depends(verify_admin_or_call_center
         ]
     }).to_list(length=None)
     
-    name_count = 0
+    updated_name_count = 0
     for prospect in prospects_without_name:
-        call_center = await db["users"].find_one({"_id": ObjectId(prospect["call_center_id"])})
-        if call_center and call_center.get("name"):
-            await db["prospects"].update_one(
-                {"_id": prospect["_id"]},
-                {"$set": {
-                    "call_center_name": call_center["name"],
-                    "updated_at": datetime.utcnow()
-                }}
-            )
-            name_count += 1
+        try:
+            call_center = await db["users"].find_one({"_id": ObjectId(prospect["call_center_id"])})
+            if call_center:
+                # Chercher un nom valide dans plusieurs champs
+                call_center_name = None
+                for field in ["name", "username", "first_name", "email"]:
+                    if field in call_center and call_center[field]:
+                        call_center_name = call_center[field]
+                        break
+                
+                if call_center_name:
+                    await db["prospects"].update_one(
+                        {"_id": prospect["_id"]},
+                        {"$set": {
+                            "call_center_name": call_center_name,
+                            "updated_at": datetime.utcnow()
+                        }}
+                    )
+                    updated_name_count += 1
+        except Exception as e:
+            print(f"Erreur lors de la mise à jour du call_center_name: {str(e)}")
     
     return {
-        "message": f"{updated_count} prospects mis à jour avec company_id, {name_count} prospects mis à jour avec call_center_name"
+        "message": f"{updated_company_count} prospects mis à jour avec company_id, {updated_name_count} prospects mis à jour avec call_center_name"
     }
