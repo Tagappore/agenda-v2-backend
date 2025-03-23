@@ -373,3 +373,53 @@ async def fix_prospects(current_user: dict = Depends(verify_admin_or_call_center
     return {
         "message": f"{updated_company_count} prospects mis à jour avec company_id, {updated_name_count} prospects mis à jour avec call_center_name"
     }
+
+@router.post("/fix-call-center-names")
+async def fix_call_center_names(current_user: dict = Depends(get_current_user)):
+    # Vérifier que l'utilisateur est un admin
+    if current_user.get("role") not in ["super_admin", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seuls les administrateurs peuvent utiliser cette fonction"
+        )
+    
+    # Récupérer la connexion à la base de données
+    db = current_user["request"].app.mongodb
+    
+    # Récupérer tous les prospects sans call_center_name ou avec call_center_name vide
+    prospects = await db["prospects"].find({
+        "call_center_id": {"$exists": True, "$ne": None},
+        "$or": [
+            {"call_center_name": {"$exists": False}},
+            {"call_center_name": ""}
+        ]
+    }).to_list(length=None)
+    
+    updated_count = 0
+    for prospect in prospects:
+        try:
+            call_center = await db["users"].find_one({"_id": ObjectId(prospect["call_center_id"])})
+            if call_center:
+                # Chercher un nom valide
+                call_center_name = None
+                for field in ["name", "username", "email"]:
+                    if field in call_center and call_center[field] and call_center[field] != "":
+                        call_center_name = call_center[field]
+                        break
+                
+                if not call_center_name:
+                    call_center_name = f"Call Center #{prospect['call_center_id']}"
+                
+                # Mettre à jour le prospect
+                await db["prospects"].update_one(
+                    {"_id": prospect["_id"]},
+                    {"$set": {
+                        "call_center_name": call_center_name,
+                        "updated_at": datetime.utcnow()
+                    }}
+                )
+                updated_count += 1
+        except Exception as e:
+            print(f"Erreur lors de la mise à jour du prospect {prospect['_id']}: {str(e)}")
+    
+    return {"message": f"{updated_count} prospects mis à jour avec le nom du call center"}
