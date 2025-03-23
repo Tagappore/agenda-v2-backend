@@ -14,6 +14,7 @@ from app.routes import appointments
 from app.routes import health
 from app.config.database import DatabaseConnection
 from app.routes.absences import router as absences_router
+from app.routes import call_center_prospect
 
 # Au début du fichier, avant d'importer quoi que ce soit d'autre
 import os
@@ -161,6 +162,7 @@ app.include_router(appointments.router, prefix="/api", tags=["appointments"])
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(absences_router, prefix="/api", tags=["absences"])
 app.include_router(call_center.router, prefix="/api", tags=["call_centers"])
+app.include_router(call_center_prospect.router, prefix="/api", tags=["call_center_prospects"])
 
 # Configuration des fichiers statiques
 STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "static")
