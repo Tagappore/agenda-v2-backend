@@ -4,7 +4,7 @@ from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from ..services.auth import AuthService
 from ..models.user import UserCreate, User, UserUpdate, AgentCreate, UserRole
-from .auth import verify_admin_or_call_center as verify_admin, get_auth_service
+from .auth import verify_admin, get_auth_service
 from app.config.database import get_database
 from bson import ObjectId
 import os
