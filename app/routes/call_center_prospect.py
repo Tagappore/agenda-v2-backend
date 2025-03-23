@@ -106,7 +106,6 @@ async def get_prospects_by_call_center(call_center_id: str, current_user: dict =
     
     return serialized_prospects
 
-# Route pour créer un nouveau prospect pour un call center
 @router.post("/prospect", status_code=status.HTTP_201_CREATED)
 async def create_prospect(prospect: ProspectBase, current_user: dict = Depends(get_current_user)):
     # Vérifie que l'utilisateur est un call center
@@ -124,10 +123,18 @@ async def create_prospect(prospect: ProspectBase, current_user: dict = Depends(g
     
     # Ajouter l'ID du call center créateur si non présent
     if not prospect_data.get("call_center_id"):
-        prospect_data["call_center_id"] = str(current_user.get("_id"))
+        prospect_data["call_center_id"] = str(current_user.get("id"))
+    
+    # IMPORTANT: Ajouter le company_id du call center
+    prospect_data["company_id"] = current_user.get("company_id")
+    
+    # Ajouter le nom du call center si disponible
+    if "name" in current_user:
+        prospect_data["call_center_name"] = current_user["name"]
         
     # Ajouter la date de création
     prospect_data["created_at"] = datetime.utcnow()
+    prospect_data["updated_at"] = datetime.utcnow()
     
     # Insérer le prospect dans la base de données
     result = await db["prospects"].insert_one(prospect_data)
