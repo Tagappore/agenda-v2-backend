@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, EmailStr, constr
 from enum import Enum
-from .auth import verify_admin
+from .auth import verify_admin, verify_admin_or_call_center
 from app.config.database import get_database
 from bson import ObjectId
 from datetime import datetime
@@ -62,6 +62,7 @@ def format_prospect_response(prospect: Dict[str, Any]) -> Dict[str, Any]:
         "annual_income": prospect.get("annual_income", 0),
         "comments": prospect.get("comments", ""),
         "company_id": prospect.get("company_id", ""),
+        "call_center_id": prospect.get("call_center_id", ""),
         "call_center_name": prospect.get("call_center_name", ""),
         "processing_status": prospect.get("processing_status", "new"),
         "created_at": prospect.get("created_at", datetime.utcnow()),
@@ -147,13 +148,21 @@ async def search_prospects(
 
 @router.get("/prospects", response_model=List[Dict[str, Any]])
 async def get_prospects(
-    current_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(verify_admin_or_call_center),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     try:
-        prospects = await db.prospects.find(
-            {"company_id": current_user["company_id"]}
-        ).to_list(1000)
+        # Filtrer les résultats en fonction du rôle de l'utilisateur
+        if current_user["role"] in ["super_admin", "admin"]:
+            # Les admins voient les prospects de leur entreprise
+            prospects = await db.prospects.find(
+                {"company_id": current_user["company_id"]}
+            ).to_list(1000)
+        elif current_user["role"] == "call_center":
+            # Les call centers ne voient que leurs propres prospects
+            prospects = await db.prospects.find(
+                {"call_center_id": current_user["id"]}
+            ).to_list(1000)
         
         return [format_prospect_response(prospect) for prospect in prospects]
         
@@ -164,7 +173,7 @@ async def get_prospects(
 @router.post("/prospects", response_model=Dict[str, Any])
 async def create_prospect(
     prospect_data: Dict[str, Any],
-    current_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(verify_admin_or_call_center),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     try:
@@ -173,10 +182,18 @@ async def create_prospect(
             raise HTTPException(status_code=409, detail="Email déjà utilisé")
 
         # Valider et définir le statut de traitement par défaut
-        prospect_data["processing_status"] = "created"  
+        prospect_data["processing_status"] = prospect_data.get("processing_status", "created")
         
-        # Créer le prospect
+        # Créer le prospect avec les informations appropriées selon le rôle
         prospect_data["company_id"] = current_user["company_id"]
+        
+        # Si c'est un call center, ajouter son ID
+        if current_user["role"] == "call_center":
+            prospect_data["call_center_id"] = current_user["id"]
+            # Ajouter aussi le nom du call center s'il est disponible
+            if "name" in current_user:
+                prospect_data["call_center_name"] = current_user["name"]
+        
         prospect_data["created_at"] = datetime.utcnow()
         prospect_data["updated_at"] = datetime.utcnow()
 
@@ -192,14 +209,19 @@ async def create_prospect(
 @router.get("/prospects/{prospect_id}", response_model=Dict[str, Any])
 async def get_prospect(
     prospect_id: str,
-    current_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(verify_admin_or_call_center),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     try:
-        prospect = await db.prospects.find_one({
-            "_id": ObjectId(prospect_id),
-            "company_id": current_user["company_id"]
-        })
+        query = {"_id": ObjectId(prospect_id)}
+        
+        # Filtrer par entreprise pour les admins ou par call center pour les call centers
+        if current_user["role"] in ["super_admin", "admin"]:
+            query["company_id"] = current_user["company_id"]
+        elif current_user["role"] == "call_center":
+            query["call_center_id"] = current_user["id"]
+            
+        prospect = await db.prospects.find_one(query)
         
         if not prospect:
             raise HTTPException(status_code=404, detail="Prospect non trouvé")
@@ -214,17 +236,22 @@ async def get_prospect(
 async def update_prospect(
     prospect_id: str,
     prospect_data: Dict[str, Any],
-    current_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(verify_admin_or_call_center),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     try:
         prospect_oid = ObjectId(prospect_id)
         
+        # Créer la requête de filtre selon le rôle
+        query = {"_id": prospect_oid}
+        
+        if current_user["role"] in ["super_admin", "admin"]:
+            query["company_id"] = current_user["company_id"]
+        elif current_user["role"] == "call_center":
+            query["call_center_id"] = current_user["id"]
+        
         # Vérifier si le prospect existe
-        existing_prospect = await db.prospects.find_one({
-            "_id": prospect_oid,
-            "company_id": current_user["company_id"]
-        })
+        existing_prospect = await db.prospects.find_one(query)
         
         if not existing_prospect:
             raise HTTPException(status_code=404, detail="Prospect non trouvé")
@@ -249,7 +276,7 @@ async def update_prospect(
         # Mettre à jour les données
         prospect_data["updated_at"] = datetime.utcnow()
         result = await db.prospects.update_one(
-            {"_id": prospect_oid, "company_id": current_user["company_id"]},
+            query,
             {"$set": prospect_data}
         )
 
@@ -267,25 +294,27 @@ async def update_prospect(
 @router.delete("/prospects/{prospect_id}")
 async def delete_prospect(
     prospect_id: str,
-    current_user: dict = Depends(verify_admin),
+    current_user: dict = Depends(verify_admin_or_call_center),
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     try:
         prospect_oid = ObjectId(prospect_id)
         
+        # Créer la requête de filtre selon le rôle
+        query = {"_id": prospect_oid}
+        
+        if current_user["role"] in ["super_admin", "admin"]:
+            query["company_id"] = current_user["company_id"]
+        elif current_user["role"] == "call_center":
+            query["call_center_id"] = current_user["id"]
+        
         # Vérifier si le prospect existe
-        prospect = await db.prospects.find_one({
-            "_id": prospect_oid,
-            "company_id": current_user["company_id"]
-        })
+        prospect = await db.prospects.find_one(query)
         
         if not prospect:
             raise HTTPException(status_code=404, detail="Prospect non trouvé")
 
-        result = await db.prospects.delete_one({
-            "_id": prospect_oid,
-            "company_id": current_user["company_id"]
-        })
+        result = await db.prospects.delete_one(query)
         
         if result.deleted_count == 0:
             raise HTTPException(status_code=500, detail="Erreur lors de la suppression")
