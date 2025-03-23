@@ -200,6 +200,17 @@ async def verify_super_admin(
     return current_user
 
 # Dependency to verify admin role - optimisée, sans requête BD
+async def verify_admin(
+    current_user: dict = Depends(get_current_user)
+):
+    if current_user["role"] not in ["super_admin", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can access this resource"
+        )
+    return current_user
+
+# Dependency to verify admin role - optimisée, sans requête BD
 async def verify_admin_or_call_center(
     current_user: dict = Depends(get_current_user)
 ):
