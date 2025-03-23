@@ -121,7 +121,6 @@ async def create_prospect(prospect: ProspectBase, current_user: dict = Depends(g
     
     # Logs de débogage
     print(f"Création de prospect par {current_user['email']} (rôle: {current_user['role']})")
-    print(f"Company ID: {current_user.get('company_id')}")
     
     # Préparer les données du prospect
     prospect_data = prospect.dict()
@@ -132,24 +131,23 @@ async def create_prospect(prospect: ProspectBase, current_user: dict = Depends(g
     # Ajouter le company_id du call center
     prospect_data["company_id"] = current_user.get("company_id")
     
-    # Récupérer le call center complet depuis la base de données
+    # CRUCIAL: Récupérer le call center pour obtenir son nom
     try:
         call_center = await db["users"].find_one({"_id": ObjectId(current_user.get("id"))})
-        print(f"Call center trouvé: {call_center}")
-        
-        # Définir le nom du call center
-        if call_center and call_center.get("name"):
-            prospect_data["call_center_name"] = call_center["name"]
-            print(f"Nom du call center défini (name): {call_center['name']}")
-        elif call_center and call_center.get("username"):
-            prospect_data["call_center_name"] = call_center["username"]
-            print(f"Nom du call center défini (username): {call_center['username']}")
-        elif call_center and call_center.get("email"):
-            prospect_data["call_center_name"] = call_center["email"]
-            print(f"Nom du call center défini (email): {call_center['email']}")
-        else:
-            prospect_data["call_center_name"] = "Call Center #" + current_user.get("id", "")
-            print(f"Nom du call center défini par défaut: {prospect_data['call_center_name']}")
+        if call_center:
+            # Définir le nom du call center
+            prospect_data["call_center_name"] = call_center.get("name", "")
+            print(f"Nom du call center défini: {prospect_data['call_center_name']}")
+            
+            # Fallbacks si name est vide
+            if not prospect_data["call_center_name"]:
+                if call_center.get("username"):
+                    prospect_data["call_center_name"] = call_center["username"]
+                elif call_center.get("email"):
+                    prospect_data["call_center_name"] = call_center["email"]
+                else:
+                    prospect_data["call_center_name"] = "Call Center"
+                print(f"Fallback - Nom du call center: {prospect_data['call_center_name']}")
     except Exception as e:
         print(f"Erreur lors de la récupération du call center: {str(e)}")
         prospect_data["call_center_name"] = "Call Center"
@@ -163,9 +161,8 @@ async def create_prospect(prospect: ProspectBase, current_user: dict = Depends(g
     # Insérer le prospect dans la base de données
     result = await db["prospects"].insert_one(prospect_data)
     
-    # Récupérer le prospect créé pour vérification
+    # Récupérer le prospect créé
     created_prospect = await db["prospects"].find_one({"_id": result.inserted_id})
-    print(f"Prospect créé avec call_center_name: {created_prospect.get('call_center_name')}")
     
     return serialize_prospect(created_prospect)
 
