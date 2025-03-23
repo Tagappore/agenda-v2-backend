@@ -51,6 +51,46 @@ def format_call_center_response(call_center: Dict[str, Any], include_password: b
         
     return formatted_call_center
 
+@router.delete("/call-centers/{call_center_id}", response_model=Dict[str, Any])
+async def delete_call_center(
+    call_center_id: str,
+    current_user: dict = Depends(verify_admin),
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    try:
+        call_center_oid = ObjectId(call_center_id)
+        
+        # Vérifier si le call center existe
+        existing_call_center = await db.users.find_one({
+            "_id": call_center_oid,
+            "company_id": current_user["company_id"],
+            "role": "call_center"
+        })
+        
+        if not existing_call_center:
+            raise HTTPException(status_code=404, detail="Call center non trouvé")
+            
+        # Supprimer la photo si elle existe
+        photo_path = existing_call_center.get("photo")
+        if photo_path and os.path.exists(photo_path.replace("/static/", "static/")):
+            os.remove(photo_path.replace("/static/", "static/"))
+            
+        # Supprimer le call center
+        result = await db.users.delete_one({
+            "_id": call_center_oid, 
+            "company_id": current_user["company_id"],
+            "role": "call_center"
+        })
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=500, detail="Erreur lors de la suppression")
+            
+        return {"success": True, "message": "Call center supprimé avec succès"}
+        
+    except Exception as e:
+        print(f"Erreur lors de la suppression du call center: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/call-centers", response_model=List[Dict[str, Any]])
 async def get_call_centers(
     current_user: dict = Depends(verify_admin),
