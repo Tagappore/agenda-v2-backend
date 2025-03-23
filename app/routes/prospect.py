@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, EmailStr, constr
 from enum import Enum
-from .auth import verify_admin, verify_admin_or_call_center
+from app.routes.auth import verify_admin_or_call_center
 from app.config.database import get_database
 from bson import ObjectId
 from datetime import datetime
