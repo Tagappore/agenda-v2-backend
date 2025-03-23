@@ -8,6 +8,7 @@ class UserRole(str, Enum):
     ADMIN = "admin"
     AGENT = "agent"
     WORK = "technician"
+    CALL_CENTER = "call_center"  # Ajout du rôle call_center
 
 class UserBase(BaseModel):
     email: EmailStr
