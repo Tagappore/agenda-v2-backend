@@ -119,7 +119,8 @@ app.add_middleware(
         "http://back.app.tag-appore.com", # Sans le slash final
         "https://back.app.tag-appore.com", # Version HTTPS
         "https://agenda-v2-backend.onrender.com",
-        "http://localhost:3000"  # Pour le développement local
+        "http://localhost:3000",
+        "http://192.168.1.90:3000 "  # Pour le développement local
     ],
     allow_credentials=True,
     allow_methods=["*"],
