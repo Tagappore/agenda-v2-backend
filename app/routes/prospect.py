@@ -152,17 +152,26 @@ async def get_prospects(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     try:
+        # Ajouter des logs pour le débogage
+        print(f"Utilisateur: {current_user['email']}, Rôle: {current_user['role']}")
+        print(f"Company ID: {current_user.get('company_id')}")
+        
         # Filtrer les résultats en fonction du rôle de l'utilisateur
         if current_user["role"] in ["super_admin", "admin"]:
-            # Les admins voient les prospects de leur entreprise
+            # Les admins voient tous les prospects de leur entreprise
+            company_id = current_user["company_id"]
             prospects = await db.prospects.find(
-                {"company_id": current_user["company_id"]}
+                {"company_id": company_id}
             ).to_list(1000)
+            print(f"Admin: {len(prospects)} prospects trouvés pour company_id {company_id}")
+            
         elif current_user["role"] == "call_center":
             # Les call centers ne voient que leurs propres prospects
+            call_center_id = current_user["id"]
             prospects = await db.prospects.find(
-                {"call_center_id": current_user["id"]}
+                {"call_center_id": call_center_id}
             ).to_list(1000)
+            print(f"Call center: {len(prospects)} prospects trouvés")
         
         return [format_prospect_response(prospect) for prospect in prospects]
         
@@ -177,6 +186,10 @@ async def create_prospect(
     db: AsyncIOMotorDatabase = Depends(get_database)
 ):
     try:
+        # Logs de débogage
+        print(f"Création de prospect par {current_user['email']} (rôle: {current_user['role']})")
+        print(f"Company ID: {current_user.get('company_id')}")
+        
         # Vérifier si l'email existe déjà
         if await db.prospects.find_one({"email": prospect_data["email"]}):
             raise HTTPException(status_code=409, detail="Email déjà utilisé")
@@ -185,7 +198,16 @@ async def create_prospect(
         prospect_data["processing_status"] = prospect_data.get("processing_status", "created")
         
         # Créer le prospect avec les informations appropriées selon le rôle
-        prospect_data["company_id"] = current_user["company_id"]
+        if current_user.get("company_id"):
+            prospect_data["company_id"] = current_user["company_id"]
+        else:
+            print("ATTENTION: Utilisateur sans company_id!")
+            # Tentative de récupération du company_id si c'est un call center
+            if current_user["role"] == "call_center":
+                user_in_db = await db.users.find_one({"_id": ObjectId(current_user["id"])})
+                if user_in_db and user_in_db.get("company_id"):
+                    prospect_data["company_id"] = user_in_db["company_id"]
+                    print(f"Company ID récupéré de la BD: {prospect_data['company_id']}")
         
         # Si c'est un call center, ajouter son ID
         if current_user["role"] == "call_center":
@@ -193,6 +215,13 @@ async def create_prospect(
             # Ajouter aussi le nom du call center s'il est disponible
             if "name" in current_user:
                 prospect_data["call_center_name"] = current_user["name"]
+        
+        # Vérifier qu'on a bien un company_id
+        if not prospect_data.get("company_id"):
+            print("ERREUR: Impossible de déterminer le company_id")
+            raise HTTPException(status_code=400, detail="Impossible de déterminer l'entreprise associée")
+        
+        print(f"Données du prospect à insérer: {prospect_data}")
         
         prospect_data["created_at"] = datetime.utcnow()
         prospect_data["updated_at"] = datetime.utcnow()
