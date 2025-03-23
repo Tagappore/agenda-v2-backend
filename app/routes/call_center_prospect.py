@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from bson import ObjectId
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime
-from app.services.auth import get_current_user
-from pydantic import BaseModel, Field
-import pymongo
+from app.routes.auth import get_current_user
+from pydantic import BaseModel
 
 router = APIRouter()
 
