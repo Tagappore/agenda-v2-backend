@@ -86,7 +86,7 @@ async def create_prospect_comment(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/prospects/{prospect_id}/comments", response_model=List[ProspectCommentResponse])
+@router.get("/prospect-comments/{prospect_id}", response_model=List[ProspectCommentResponse])
 async def get_prospect_comments(
     prospect_id: str,
     current_user: dict = Depends(verify_admin_or_call_center),
