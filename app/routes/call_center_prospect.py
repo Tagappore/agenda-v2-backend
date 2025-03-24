@@ -5,10 +5,19 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from app.routes.auth import get_current_user, verify_admin_or_call_center
 from pydantic import BaseModel
+from enum import Enum
 
 router = APIRouter()
 
-# Modèle Pydantic pour les prospects
+# Définir l'énumération de statut de traitement pour s'aligner sur le modèle principal
+class ProcessingStatus(str, Enum):
+    CREATED = "created"      # Nouveau
+    CONFIRMED = "confirmed"  # Placé
+    NEW_PLAN = "new_plan"    # Replanifier
+    COMPLETED = "completed"  # Terminé
+    CANCELLED = "cancelled"  # Annulé
+
+# Modèle Pydantic pour les prospects avec statut mis à jour
 class ProspectBase(BaseModel):
     first_name: str
     last_name: str
@@ -24,13 +33,13 @@ class ProspectBase(BaseModel):
     phone_mobile: str
     comments: Optional[str] = None
     call_center_id: Optional[str] = None
-    processing_status: str = "new"
+    processing_status: ProcessingStatus = ProcessingStatus.CREATED
 
-# Modèle pour les statistiques
+# Modèle pour les statistiques - mis à jour pour utiliser les statuts corrects
 class CallCenterStats(BaseModel):
     totalProspects: int
-    newProspects: int
-    convertedProspects: int
+    newProspects: int  # Prospects avec status "created"
+    placedProspects: int  # Prospects avec status "confirmed"
     pendingAppointments: int
 
 # Convertir ObjectId en str pour la sérialisation JSON
@@ -62,15 +71,15 @@ async def get_call_center_stats(company_id: str, current_user: dict = Depends(ge
     # Récupérer tous les prospects associés au call center
     prospects = await db["prospects"].find({"call_center_id": company_id}).to_list(length=None)
     
-    # Préparer les statistiques
+    # Préparer les statistiques avec les statuts corrects
     total_prospects = len(prospects)
-    new_prospects = len([p for p in prospects if p.get("status") == "new" or p.get("processing_status") == "new"])
-    converted_prospects = len([p for p in prospects if p.get("status") == "converted" or p.get("processing_status") == "converted"])
+    new_prospects = len([p for p in prospects if p.get("processing_status") == ProcessingStatus.CREATED.value])
+    placed_prospects = len([p for p in prospects if p.get("processing_status") == ProcessingStatus.CONFIRMED.value])
     
     # Récupérer les rendez-vous en attente
     appointments = await db["appointments"].find({
         "company_id": company_id,
-        "status": {"$in": ["confirmed", "new_plan"]}
+        "status": {"$in": [ProcessingStatus.CONFIRMED.value, ProcessingStatus.NEW_PLAN.value]}
     }).to_list(length=None)
     
     pending_appointments = len(appointments)
@@ -79,7 +88,7 @@ async def get_call_center_stats(company_id: str, current_user: dict = Depends(ge
     stats = {
         "totalProspects": total_prospects,
         "newProspects": new_prospects,
-        "convertedProspects": converted_prospects,
+        "placedProspects": placed_prospects,
         "pendingAppointments": pending_appointments
     }
     
@@ -124,6 +133,10 @@ async def create_prospect(prospect: ProspectBase, current_user: dict = Depends(g
     
     # Préparer les données du prospect
     prospect_data = prospect.dict()
+    
+    # Vérifier que processing_status est une valeur valide
+    if prospect_data['processing_status'] not in [status.value for status in ProcessingStatus]:
+        prospect_data['processing_status'] = ProcessingStatus.CREATED.value
     
     # Ajouter l'ID du call center
     prospect_data["call_center_id"] = current_user.get("id")
@@ -199,6 +212,13 @@ async def update_prospect(prospect_id: str, prospect_data: Dict[str, Any], curre
     for field in protected_fields:
         if field in prospect_data:
             del prospect_data[field]
+    
+    # Valider le statut de traitement si présent
+    if "processing_status" in prospect_data and prospect_data["processing_status"] not in [status.value for status in ProcessingStatus]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Statut de traitement invalide. Valeurs possibles: {[s.value for s in ProcessingStatus]}"
+        )
         
     # Ajouter la date de mise à jour
     prospect_data["updated_at"] = datetime.utcnow()
