@@ -1,6 +1,6 @@
 # app/models/prospect_comment.py
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, field_serializer
+from typing import Optional, Any, ClassVar, Dict
 from bson import ObjectId
 from datetime import datetime
 from enum import Enum
@@ -12,20 +12,24 @@ class CommentType(str, Enum):
     CALL_CENTER = "call_center"
 
 
-class PyObjectId(ObjectId):
+class PyObjectId(str):
+    """Classe pour gérer les ObjectId de MongoDB de manière compatible avec Pydantic V2"""
     @classmethod
     def __get_validators__(cls):
-        yield cls.validate
+        # Cette méthode est conservée pour la compatibilité arrière
+        return [cls.validate]
 
     @classmethod
     def validate(cls, v):
         if not ObjectId.is_valid(v):
             raise ValueError("Invalid ObjectId")
-        return ObjectId(v)
-
+        return str(v)
+    
     @classmethod
-    def __modify_schema__(cls, field_schema):
-        field_schema.update(type="string")
+    def __get_pydantic_json_schema__(cls, _core_schema, field_schema):
+        # Remplace __modify_schema__ pour Pydantic V2
+        field_schema.update(type="string", format="objectid")
+        return field_schema
 
 
 class ProspectCommentBase(BaseModel):
@@ -43,12 +47,14 @@ class ProspectCommentInDB(ProspectCommentBase):
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     company_id: str
 
-    class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
-        json_encoders = {
-            ObjectId: str
+    model_config = {
+        "populate_by_name": True,
+        "json_schema_extra": {
+            "json_encoders": {
+                ObjectId: str
+            }
         }
+    }
 
 
 class ProspectCommentCreate(ProspectCommentBase):
@@ -60,9 +66,11 @@ class ProspectCommentResponse(ProspectCommentBase):
     """Modèle pour la réponse de commentaires de prospects"""
     id: str
 
-    class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
-        json_encoders = {
-            ObjectId: str
-        }
+    model_config = {
+        "from_attributes": True,
+        "populate_by_name": True
+    }
+    
+    @field_serializer('created_at')
+    def serialize_dt(self, dt: datetime) -> str:
+        return dt.isoformat()
