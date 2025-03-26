@@ -1,8 +1,7 @@
-
-# backend/app/routes/simulateurs.py (notez le 's')
+# backend/app/routes/simulateurs.py
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.models.simulateur import SimulateurData  # importation depuis simulateur.py (sans 's')
-from app.routes.auth import verify_super_admin, get_auth_service  # Importer depuis routes/auth.py
+from app.models.simulateur import SimulateurData
+from app.routes.auth import verify_token, verify_super_admin  # Importation correcte
 from app.config.database import get_database
 from typing import List
 from bson import ObjectId
@@ -37,7 +36,7 @@ async def submit_simulateur_data(data: SimulateurData):
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
 
 @router.get("/data", response_model=List[SimulateurData])
-async def get_simulateur_data(current_user = Depends(is_super_admin)):
+async def get_simulateur_data(current_user = Depends(verify_super_admin)):  # Changé ici
     """
     Récupère toutes les données du simulateur.
     Accessible uniquement aux super admins.
@@ -60,7 +59,7 @@ async def get_simulateur_data(current_user = Depends(is_super_admin)):
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
 
 @router.get("/data/{data_id}", response_model=SimulateurData)
-async def get_simulateur_data_by_id(data_id: str, current_user = Depends(is_super_admin)):
+async def get_simulateur_data_by_id(data_id: str, current_user = Depends(verify_super_admin)):  # Changé ici
     """
     Récupère les données détaillées d'une simulation par son ID.
     Accessible uniquement aux super admins.
@@ -89,7 +88,7 @@ async def get_simulateur_data_by_id(data_id: str, current_user = Depends(is_supe
         raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
 
 @router.delete("/data/{data_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_simulateur_data(data_id: str, current_user = Depends(is_super_admin)):
+async def delete_simulateur_data(data_id: str, current_user = Depends(verify_super_admin)):  # Changé ici
     """
     Supprime une entrée de simulation par son ID.
     Accessible uniquement aux super admins.
