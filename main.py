@@ -16,6 +16,7 @@ from app.config.database import DatabaseConnection
 from app.routes.absences import router as absences_router
 from app.routes import call_center_prospect
 from app.routes import prospect_comments # Nouvelle importation pour les commentaires de prospect
+from app.routes import simulateurs 
 
 # Au début du fichier, avant d'importer quoi que ce soit d'autre
 import os
@@ -165,7 +166,7 @@ app.include_router(absences_router, prefix="/api", tags=["absences"])
 app.include_router(call_center.router, prefix="/api", tags=["call_centers"])
 app.include_router(call_center_prospect.router, prefix="/api", tags=["call_center_prospects"])
 app.include_router(prospect_comments.router, prefix="/api", tags=["prospect-comments"]) # Ajout du router des commentaires
-
+app.include_router(simulateurs.router, prefix="/api", tags=["simulateur"])
 # Configuration des fichiers statiques
 STATIC_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "static")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
