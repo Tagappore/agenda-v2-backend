@@ -1,7 +1,7 @@
 # backend/app/routes/simulateurs.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.models.simulateur import SimulateurData
-from app.routes.auth import verify_token, verify_super_admin  # Importation correcte
+from app.routes.auth import verify_super_admin  # Importation correcte
 from app.config.database import get_database
 from typing import List
 from bson import ObjectId
