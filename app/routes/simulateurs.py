@@ -2,7 +2,7 @@
 # backend/app/routes/simulateurs.py (notez le 's')
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.models.simulateur import SimulateurData  # importation depuis simulateur.py (sans 's')
-from app.services.auth import get_current_user, is_super_admin
+from app.routes.auth import verify_super_admin, get_auth_service  # Importer depuis routes/auth.py
 from app.config.database import get_database
 from typing import List
 from bson import ObjectId
